@@ -110,7 +110,7 @@ log_die()   { log_error "$@"; exit 1; }
 # ==============================================================================
 
 emscripten_init() {
-    [[ -v EMSCRIPTEN_INITIALIZED ]] && return 0
+    [[ -n "${EMSCRIPTEN_INITIALIZED:-}" ]] && return 0
     
     local em_dir="$EMSDK_DIR/upstream/emscripten"
     
