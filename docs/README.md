@@ -92,5 +92,5 @@ _OLD/2026-01-17-refactor-oc-naming.md
 ### work/ (travaux en cours)
 | Fichier | Status | Description |
 |---------|--------|-------------|
-| `feature-ms-sdl-storage.md` | planned | Stockage persistant Native/WASM |
+| `feature-ms-preset-storage/` | planned | Système de presets avec persistence (dossier multi-phase) |
 | `feature-ms-sequencer/` | planned | Step Sequencer modulaire (dossier multi-phase) |
