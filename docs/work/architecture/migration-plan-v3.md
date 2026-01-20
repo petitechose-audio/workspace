@@ -789,9 +789,10 @@ git push origin refactor/architecture-cleanup
 - [x] Aucun ancien namespace (`oc::config`)
 - [x] Namespaces = chemins de fichiers
 - [x] Fichiers legacy supprimés
-- [ ] Compiler les exemples (HALs, ui-lvgl) - à vérifier manuellement
+- [x] HALs vérifiés et corrigés (`core::Result` → `oc::Result`, `core::InputConfig` → `core::input::InputConfig`)
+- [x] Exemples compilent avec `ContextBase` au lieu de `IContext`
 
-### Prêt pour merge sur main.
+### ✅ Migration terminée - Mergé sur main (2026-01-20)
 
 ---
 
