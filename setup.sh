@@ -139,7 +139,7 @@ check_system_deps() {
             fi
 
             if [[ ${#missing[@]} -gt 0 ]]; then
-                log_error "Missing system libraries: ${missing[*]}"
+                log_error "Missing system dependencies: ${missing[*]}"
                 echo ""
                 echo "Install with your package manager:"
                 echo "  Fedora/RHEL:   sudo dnf install SDL2-devel alsa-lib-devel"
@@ -508,6 +508,71 @@ export PATH=\"\$WORKSPACE_ROOT/open-control/cli-tools/bin:\$PATH\"
 }
 
 # =============================================================================
+# Linux: snd-virmidi (Virtual MIDI ports for Bitwig)
+# =============================================================================
+setup_virmidi() {
+    [[ "$OS" != "linux" ]] && return 0
+
+    log_info "=== Configuring Virtual MIDI (snd-virmidi) ==="
+
+    # Check if module is available
+    if ! modinfo snd-virmidi &>/dev/null; then
+        log_warn "snd-virmidi module not found (may need kernel headers)"
+        return 0
+    fi
+
+    local modprobe_file="/etc/modprobe.d/midi-studio-virmidi.conf"
+    local modules_file="/etc/modules-load.d/midi-studio-virmidi.conf"
+
+    # Check if already configured
+    if [[ -f "$modprobe_file" ]]; then
+        log_ok "snd-virmidi already configured"
+        # Check if loaded
+        if lsmod | grep -q snd_virmidi; then
+            log_ok "snd-virmidi module loaded"
+        else
+            log_warn "snd-virmidi not loaded. Run: sudo modprobe snd-virmidi"
+        fi
+        return 0
+    fi
+
+    echo ""
+    echo "Virtual MIDI ports are needed for Bitwig to see our app's MIDI."
+    echo "This requires sudo to create system config files."
+    echo ""
+    echo "Files to create:"
+    echo "  $modprobe_file  (module options)"
+    echo "  $modules_file   (auto-load at boot)"
+    echo ""
+
+    if [[ $INTERACTIVE -eq 1 ]]; then
+        read -p "Configure snd-virmidi? [Y/n] " yn
+        if [[ "$yn" == "n" || "$yn" == "N" ]]; then
+            log_warn "Skipped. You can configure manually later:"
+            echo "  echo 'options snd-virmidi midi_devs=2' | sudo tee $modprobe_file"
+            echo "  echo 'snd-virmidi' | sudo tee $modules_file"
+            echo "  sudo modprobe snd-virmidi"
+            return 0
+        fi
+    else
+        log_warn "Non-interactive mode: skipping snd-virmidi setup"
+        return 0
+    fi
+
+    # Create modprobe config (1 virtual MIDI device = 1 bidirectional port)
+    echo 'options snd-virmidi midi_devs=1' | sudo tee "$modprobe_file" > /dev/null
+
+    # Auto-load at boot
+    echo 'snd-virmidi' | sudo tee "$modules_file" > /dev/null
+
+    # Load module now
+    sudo modprobe snd-virmidi
+
+    log_ok "snd-virmidi configured and loaded"
+    log_info "Virtual MIDI port 'Virtual Raw MIDI' is now available in Bitwig"
+}
+
+# =============================================================================
 # Optional: PlatformIO, Rust
 # =============================================================================
 setup_optional() {
@@ -587,7 +652,10 @@ main() {
     
     configure_shell
     echo ""
-    
+
+    setup_virmidi
+    echo ""
+
     setup_optional
     
     echo ""

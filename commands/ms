@@ -30,20 +30,21 @@ cleanup_bridge() {
 
 start_bridge() {
     local transport="$1"
-    local port="$2"
-    
+    local ctrl_port="$2"
+    local host_port="$3"
+
     if [[ ! -x "$OC_BRIDGE" ]]; then
         log_error "Bridge not found: $OC_BRIDGE"
         log_error "Run: cd open-control/bridge && cargo build --release"
         return 1
     fi
-    
+
     trap cleanup_bridge EXIT INT TERM
-    
-    "$OC_BRIDGE" --headless --controller "$transport" --controller-port "$port" &
+
+    "$OC_BRIDGE" --headless --controller "$transport" --controller-port "$ctrl_port" --udp-port "$host_port" &
     BRIDGE_PID=$!
     sleep 0.3
-    
+
     if ! kill -0 "$BRIDGE_PID" 2>/dev/null; then
         log_error "Bridge failed to start"
         return 1
@@ -454,13 +455,14 @@ cmd_native_run() {
     local bin_dir="$ROOT/bin/$codebase/native"
     local exe
     
-    # Extract bridge port from C++ source and start bridge
+    # Extract controller port from C++ source and start bridge
+    # Host port: 9001 = native simulator
     local main_native="$codebase_path/sdl/main-native.cpp"
     if [[ -f "$main_native" ]]; then
-        local bridge_port
-        bridge_port="$(get_udp_port "$main_native")"
-        if [[ -n "$bridge_port" ]]; then
-            start_bridge "udp" "$bridge_port" || return 1
+        local ctrl_port
+        ctrl_port="$(get_udp_port "$main_native")"
+        if [[ -n "$ctrl_port" ]]; then
+            start_bridge "udp" "$ctrl_port" 9001 || return 1
         fi
     fi
     
@@ -514,13 +516,14 @@ cmd_wasm_serve() {
     local bin_dir="$ROOT/bin/$codebase/wasm"
     local http_port=8080
     
-    # Extract bridge port from C++ source and start bridge
+    # Extract controller port from C++ source and start bridge
+    # Host port: 9002 = wasm simulator
     local main_wasm="$codebase_path/sdl/main-wasm.cpp"
     if [[ -f "$main_wasm" ]]; then
-        local bridge_port
-        bridge_port="$(get_ws_port "$main_wasm")"
-        if [[ -n "$bridge_port" ]]; then
-            start_bridge "ws" "$bridge_port" || return 1
+        local ctrl_port
+        ctrl_port="$(get_ws_port "$main_wasm")"
+        if [[ -n "$ctrl_port" ]]; then
+            start_bridge "ws" "$ctrl_port" 9002 || return 1
         fi
     fi
     
