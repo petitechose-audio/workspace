@@ -2,9 +2,15 @@
 # =============================================================================
 # MIDI Studio / Open Control - Development Environment Setup
 # =============================================================================
-# Clone all repos + install all build tools (100% portable)
+# Clone all repos + install all build tools (100% portable, no sudo required)
 #
 # Usage: ./setup.sh [--skip-tools] [--skip-repos]
+#
+# Prerequisites:
+#   All OS:   git, gh (GitHub CLI authenticated), python3
+#   Linux:    SDL2 + ALSA dev packages (see check_system_deps for commands)
+#   macOS:    Homebrew + SDL2 (brew install sdl2)
+#   Windows:  Git for Windows (provides Git Bash to run this script)
 # =============================================================================
 
 set -euo pipefail
@@ -63,6 +69,11 @@ check_prerequisites() {
     log_info "Checking prerequisites..."
     local failed=0
 
+    # Windows note: this script requires Git Bash (comes with Git for Windows)
+    if [[ "$OS" == "windows" ]]; then
+        log_info "Windows: running in Git Bash (from Git for Windows)"
+    fi
+
     # Git
     if ! command -v git &>/dev/null; then
         log_error "git not found"
@@ -99,6 +110,65 @@ check_prerequisites() {
     fi
 
     log_ok "Prerequisites OK"
+}
+
+# =============================================================================
+# System Dependencies Check (SDL2, ALSA - no sudo, just verify)
+# =============================================================================
+check_system_deps() {
+    log_info "Checking system dependencies..."
+    local missing=()
+
+    case "$OS" in
+        linux)
+            # Check pkg-config exists
+            if ! command -v pkg-config &>/dev/null; then
+                log_error "pkg-config not found (needed to check dependencies)"
+                echo "  Install: sudo apt install pkg-config  OR  sudo dnf install pkgconf-pkg-config"
+                exit 1
+            fi
+
+            # SDL2
+            if ! pkg-config --exists sdl2 2>/dev/null; then
+                missing+=("SDL2")
+            fi
+
+            # ALSA (needed for libremidi MIDI support)
+            if ! pkg-config --exists alsa 2>/dev/null; then
+                missing+=("ALSA")
+            fi
+
+            if [[ ${#missing[@]} -gt 0 ]]; then
+                log_error "Missing system libraries: ${missing[*]}"
+                echo ""
+                echo "Install with your package manager:"
+                echo "  Fedora/RHEL:   sudo dnf install SDL2-devel alsa-lib-devel"
+                echo "  Ubuntu/Debian: sudo apt install libsdl2-dev libasound2-dev"
+                echo "  Arch:          sudo pacman -S sdl2 alsa-lib"
+                echo "  openSUSE:      sudo zypper install SDL2-devel alsa-devel"
+                echo ""
+                echo "Then re-run: ./setup.sh"
+                exit 1
+            fi
+            ;;
+        macos)
+            # SDL2 via Homebrew
+            if ! brew list sdl2 &>/dev/null 2>&1; then
+                log_error "SDL2 not found"
+                echo ""
+                echo "Install with: brew install sdl2"
+                echo "Then re-run: ./setup.sh"
+                exit 1
+            fi
+            # CoreMIDI is built-in on macOS, no check needed
+            ;;
+        windows)
+            # Windows: SDL2 is bundled in tools/windows/, checked later in setup_sdl2_windows
+            # WinMM is built-in
+            ;;
+    esac
+
+    log_ok "System dependencies OK"
 }
 
 # =============================================================================
@@ -300,63 +370,42 @@ setup_zig() {
     log_ok "zig $version"
 }
 
-setup_sdl2() {
-    local sdl_dir="$TOOLS_DIR/SDL2"
-    
-    if [[ -f "$sdl_dir/lib/libSDL2.a" ]] || [[ -f "$sdl_dir/lib/libSDL2.dll.a" ]]; then
-        local ver=$(grep "^Version:" "$sdl_dir/lib/pkgconfig/sdl2.pc" 2>/dev/null | cut -d' ' -f2 || echo "installed")
-        log_ok "SDL2 $ver"
+setup_sdl2_windows() {
+    # Windows only - Linux/macOS use system packages (checked in check_system_deps)
+    if [[ "$OS" != "windows" ]]; then
         return 0
     fi
-    
+
+    local sdl_dir="$TOOLS_DIR/windows/SDL2"
+
+    if [[ -f "$sdl_dir/lib/libSDL2.a" ]] || [[ -f "$sdl_dir/lib/libSDL2.dll.a" ]]; then
+        local ver=$(grep "^Version:" "$sdl_dir/lib/pkgconfig/sdl2.pc" 2>/dev/null | cut -d' ' -f2 || echo "installed")
+        log_ok "SDL2 $ver (bundled)"
+        return 0
+    fi
+
     # Get latest SDL2 version (not SDL3)
     local version
     version=$(gh api "repos/libsdl-org/SDL/releases" --jq '[.[] | select(.tag_name | startswith("release-2"))][0].tag_name' | sed 's/release-//')
-    
+
     if [[ -z "$version" ]]; then
         log_error "Could not determine SDL2 version"
         return 1
     fi
-    
-    log_info "Installing SDL2 $version..."
-    
-    local url
-    case "$OS" in
-        linux)
-            # Linux: download source and extract prebuilt or use dev package structure
-            url="https://github.com/libsdl-org/SDL/releases/download/release-${version}/SDL2-devel-${version}-mingw.tar.gz"
-            download_and_extract "$url" "$sdl_dir"
-            # Use x86_64 mingw build
-            if [[ -d "$sdl_dir/SDL2-${version}/x86_64-w64-mingw32" ]]; then
-                # Actually for Linux we need different approach - download source
-                rm -rf "$sdl_dir"
-                mkdir -p "$sdl_dir"
-                log_warn "SDL2 on Linux: downloading source..."
-                local src_url="https://github.com/libsdl-org/SDL/releases/download/release-${version}/SDL2-${version}.tar.gz"
-                download_and_extract "$src_url" "$sdl_dir"
-                log_warn "SDL2 needs to be compiled. Run: cd $sdl_dir && ./configure && make"
-                log_warn "Or install via package manager: sudo apt install libsdl2-dev"
-            fi
-            ;;
-        macos)
-            url="https://github.com/libsdl-org/SDL/releases/download/release-${version}/SDL2-${version}.dmg"
-            log_warn "SDL2 on macOS: install via Homebrew is easier"
-            log_warn "  brew install sdl2"
-            log_warn "Or download from: $url"
-            return 0
-            ;;
-        windows)
-            url="https://github.com/libsdl-org/SDL/releases/download/release-${version}/SDL2-devel-${version}-mingw.tar.gz"
-            download_and_extract "$url" "$sdl_dir"
-            # Move x86_64-w64-mingw32 contents to root
-            if [[ -d "$sdl_dir/SDL2-${version}/x86_64-w64-mingw32" ]]; then
-                mv "$sdl_dir/SDL2-${version}/x86_64-w64-mingw32"/* "$sdl_dir"/
-                rm -rf "$sdl_dir/SDL2-${version}"
-            fi
-            ;;
-    esac
-    
-    log_ok "SDL2 $version"
+
+    log_info "Installing SDL2 $version for Windows..."
+
+    local url="https://github.com/libsdl-org/SDL/releases/download/release-${version}/SDL2-devel-${version}-mingw.tar.gz"
+    mkdir -p "$TOOLS_DIR/windows"
+    download_and_extract "$url" "$sdl_dir"
+
+    # Move x86_64-w64-mingw32 contents to root
+    if [[ -d "$sdl_dir/SDL2-${version}/x86_64-w64-mingw32" ]]; then
+        mv "$sdl_dir/SDL2-${version}/x86_64-w64-mingw32"/* "$sdl_dir"/
+        rm -rf "$sdl_dir/SDL2-${version}"
+    fi
+
+    log_ok "SDL2 $version (bundled)"
 }
 
 setup_emscripten() {
@@ -383,15 +432,15 @@ setup_emscripten() {
 
 install_tools() {
     log_info "=== Installing build tools (portable) ==="
-    
+
     mkdir -p "$TOOLS_DIR"
-    
+
     setup_cmake
     setup_ninja
     setup_zig
-    setup_sdl2
+    setup_sdl2_windows  # Windows only - Linux/macOS use system packages
     setup_emscripten
-    
+
     log_ok "All tools installed in $TOOLS_DIR"
 }
 
@@ -428,7 +477,7 @@ configure_shell() {
 export WORKSPACE_ROOT=\"$WORKSPACE\"
 export WORKSPACE_TOOLS=\"\$WORKSPACE_ROOT/tools\"
 export ZIG_DIR=\"\$WORKSPACE_TOOLS/zig\"
-export SDL2_ROOT=\"\$WORKSPACE_TOOLS/SDL2\"
+export SDL2_ROOT=\"\$WORKSPACE_TOOLS/windows/SDL2\"  # Windows only, Linux/macOS use system SDL2
 
 # Add tools to PATH
 export PATH=\"\$WORKSPACE_TOOLS/cmake/bin:\$PATH\"
@@ -522,9 +571,10 @@ main() {
     
     detect_platform
     check_prerequisites
-    
+    check_system_deps
+
     echo ""
-    
+
     if [[ $skip_repos -eq 0 ]]; then
         clone_all_repos
         echo ""
