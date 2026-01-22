@@ -1,0 +1,31 @@
+# MIDI Studio Configuration
+
+[ports]
+# Bridge host ports (Bitwig extension listens here)
+hardware = 9000
+native = 9001
+wasm = 9002
+
+[ports.controller]
+core_native = 8000
+core_wasm = 8100
+bitwig_native = 8001
+bitwig_wasm = 8101
+
+[midi]
+linux = "VirMIDI"
+macos_input = "MIDI Studio IN"
+macos_output = "MIDI Studio OUT"
+windows = "loopMIDI"
+
+[paths]
+# Relative to workspace root
+bridge = "open-control/bridge"
+extension = "midi-studio/plugin-bitwig/host"
+tools = "tools"
+
+[bitwig]
+# Extension installation paths (auto-detected, can override)
+# linux = "~/.BitwigStudio/Extensions"
+# macos = "~/Documents/Bitwig Studio/Extensions"
+# windows = "%USERPROFILE%/Documents/Bitwig Studio/Extensions"

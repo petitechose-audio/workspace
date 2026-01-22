@@ -10,8 +10,14 @@ build/
 target/
 node_modules/
 
+# Local binary artifacts
+macros.bin
+
 # Downloaded tools (platform-specific binaries)
 tools/
+
+# Python (workspace venv)
+.venv/
 
 # IDE
 .vscode/

@@ -1,0 +1,9 @@
+[project]
+name = "petitechose-audio-workspace"
+version = "0.1.0"
+description = "MIDI Studio workspace CLI (ms)"
+requires-python = ">=3.13"
+dependencies = [
+  "rich>=13.0.0",
+  "typer>=0.12.0",
+]

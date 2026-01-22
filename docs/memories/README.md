@@ -94,3 +94,4 @@ _OLD/2026-01-17-refactor-oc-naming.md
 |---------|--------|-------------|
 | `feature-ms-preset-storage/` | planned | Système de presets avec persistence (dossier multi-phase) |
 | `feature-ms-sequencer/` | planned | Step Sequencer modulaire (dossier multi-phase) |
+| `refactor-all-dev-cli-dx-max/` | planned | Refactor setup + ms CLI pour DX maximale |
