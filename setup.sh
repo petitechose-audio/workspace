@@ -939,7 +939,11 @@ $marker_start
 export WORKSPACE_ROOT=\"$WORKSPACE\"
 export WORKSPACE_TOOLS=\"\$WORKSPACE_ROOT/tools\"
 export ZIG_DIR=\"\$WORKSPACE_TOOLS/zig\"
-export SDL2_ROOT=\"\$WORKSPACE_TOOLS/windows/SDL2\"  # Windows only, Linux/macOS use system SDL2
+
+# Windows (Git Bash): use bundled SDL2
+case \"\$(uname -s)\" in
+  CYGWIN*|MINGW*|MSYS*) export SDL2_ROOT=\"\$WORKSPACE_TOOLS/windows/SDL2\" ;;
+esac
 
 # Java
 if [[ -d \"\$WORKSPACE_TOOLS/jdk/Contents/Home\" ]]; then

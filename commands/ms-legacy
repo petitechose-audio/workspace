@@ -91,6 +91,12 @@ detect_platform() {
 
 readonly PLATFORM="$(detect_platform)"
 
+# Prevent Windows SDL2 bundle from poisoning native Linux/macOS builds.
+# The workspace shell config may export SDL2_ROOT for Git Bash.
+if [[ "$PLATFORM" != "windows" ]]; then
+    unset SDL2_ROOT
+fi
+
 # ==============================================================================
 # Terminal Output
 # ==============================================================================
@@ -460,6 +466,16 @@ cmd_native_build() {
     log_info "Building $codebase (native)"
     
     check_native_deps || return 1
+
+    # If this build directory was configured while SDL2_ROOT pointed to the
+    # bundled Windows SDL2, CMake will inject -mwindows and other MinGW flags,
+    # which breaks native Linux/macOS builds.
+    if [[ "$PLATFORM" != "windows" && -f "$build_dir/build.ninja" ]]; then
+        if grep -q "$TOOLS_DIR/windows/SDL2" "$build_dir/build.ninja" 2>/dev/null; then
+            log_info "Resetting misconfigured build dir (Windows SDL2 detected)"
+            rm -rf "$build_dir"
+        fi
+    fi
     
     if [[ ! -f "$build_dir/build.ninja" ]]; then
         local cmake_args=(
