@@ -19,6 +19,14 @@ from rich.text import Text
 from . import __version__
 from .config import load_config
 
+# New modular imports
+from .platform import detect_platform as _detect_platform
+from .codebase import resolve_codebase, list_codebases, CodebaseNotFoundError
+from .tools import ToolResolver, ToolNotFoundError, run_tool
+from .build.teensy import build_teensy, upload_teensy, monitor_teensy
+from .build.native import build_native, run_native
+from .build.wasm import build_wasm, serve_wasm
+
 
 app = typer.Typer(add_completion=False, no_args_is_help=False)
 console = Console()
@@ -63,7 +71,23 @@ def run_subprocess(
     )
 
 
+def get_bin_root() -> Path:
+    """Get bin output directory."""
+    return workspace_root() / "bin"
+
+
+def get_build_root() -> Path:
+    """Get build directory."""
+    return workspace_root() / ".build"
+
+
+def get_tools() -> ToolResolver:
+    """Get tool resolver for current workspace."""
+    return ToolResolver(workspace_root())
+
+
 def run_live(cmd: list[str], *, cwd: Path) -> int:
+    """Run a command with live output."""
     proc = subprocess.run(cmd, cwd=str(cwd))
     return proc.returncode
 
@@ -73,14 +97,8 @@ def which(cmd: str) -> Optional[str]:
 
 
 def detect_platform() -> str:
-    sysname = platform.system().lower()
-    if sysname.startswith("darwin"):
-        return "macos"
-    if sysname.startswith("linux"):
-        return "linux"
-    if sysname.startswith("windows"):
-        return "windows"
-    return "unknown"
+    """Detect platform (uses new platform module)."""
+    return _detect_platform()
 
 
 def _is_git_repo(path: Path) -> bool:
@@ -195,6 +213,35 @@ def check_cmd(
     extra = ""
     if version_args:
         proc = run_subprocess([name, *version_args])
+        if proc.returncode == 0:
+            extra = first_line(proc.stdout + proc.stderr)
+
+    msg = f"{name}: {extra}" if extra else f"{name}: ok"
+    console.print(msg, style="green")
+    return True
+
+
+def check_tool(
+    tools: ToolResolver,
+    name: str,
+    version_args: list[str] | None = None,
+    *,
+    required: bool = True,
+) -> bool:
+    """Check a tool using ToolResolver (handles bundled tools and .cmd files)."""
+    try:
+        resolver_method = getattr(tools, name, None)
+        if resolver_method is None:
+            raise ToolNotFoundError(name)
+        path = resolver_method()
+    except ToolNotFoundError:
+        style = "red" if required else "yellow"
+        console.print(f"{name}: missing", style=style)
+        return not required
+
+    extra = ""
+    if version_args:
+        proc = run_tool(path, version_args, capture=True)
         if proc.returncode == 0:
             extra = first_line(proc.stdout + proc.stderr)
 
@@ -358,16 +405,21 @@ def doctor(
         console.print("config.toml: missing", style="yellow")
 
     console.print("\n[bold]Tools[/]")
+    tools = get_tools()
+
+    # System tools (always in PATH)
     failed |= not check_cmd("git", ["--version"])
     failed |= not check_cmd("gh", ["--version"])
     failed |= not check_cmd("uv", ["--version"])
-    failed |= not check_cmd("cmake", ["--version"])
-    failed |= not check_cmd("ninja", ["--version"])
-    failed |= not check_cmd("zig", ["version"])
-    check_cmd("bun", ["--version"], required=False)
-    failed |= not check_cmd("java", ["-version"])
-    failed |= not check_cmd("mvn", ["-version"])
-    failed |= not check_cmd("pio", ["--version"])
+
+    # Bundled tools (in tools/ OR PATH, handles .cmd on Windows)
+    failed |= not check_tool(tools, "cmake", ["--version"])
+    failed |= not check_tool(tools, "ninja", ["--version"])
+    failed |= not check_tool(tools, "zig", ["version"])
+    check_tool(tools, "bun", ["--version"], required=False)
+    failed |= not check_tool(tools, "java", ["-version"])
+    failed |= not check_tool(tools, "mvn", ["-version"])
+    failed |= not check_tool(tools, "pio", ["--version"])
 
     if which("cargo") is None:
         console.print(
@@ -882,82 +934,261 @@ def icons(
         raise typer.Exit(code=ExitCode.BUILD_ERROR)
 
 
-def _legacy_script() -> Path:
-    return workspace_root() / "commands" / "ms-legacy"
+@app.command(name="run")
+def run_cmd(
+    codebase: str = typer.Argument(..., help="Codebase: core, bitwig, ..."),
+) -> None:
+    """Build and run native desktop simulator."""
+    root = workspace_root()
 
-
-def _delegate_to_legacy(args: list[str]) -> None:
-    legacy = _legacy_script()
-    if not legacy.exists():
-        console.print("error: legacy ms script not found", style="red")
+    try:
+        cb = resolve_codebase(codebase, root)
+        tools = get_tools()
+    except CodebaseNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.USER_ERROR)
+    except ToolNotFoundError as e:
+        console.print(f"error: {e}", style="red")
         raise typer.Exit(code=ExitCode.ENV_ERROR)
 
-    os.execv(str(legacy), [str(legacy), *args])
+    console.print(f"[bold]Running {codebase} (native)[/]")
+    code = run_native(
+        cb,
+        tools=tools,
+        workspace=root,
+        bin_root=get_bin_root(),
+        build_root=get_build_root(),
+    )
+
+    if code != 0:
+        raise typer.Exit(code=ExitCode.BUILD_ERROR)
 
 
-@app.command(
-    name="run",
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
-)
-def run(ctx: typer.Context) -> None:
-    """Run native simulator (delegates to legacy for now)."""
+@app.command()
+def web(
+    codebase: str = typer.Argument(..., help="Codebase: core, bitwig, ..."),
+    port: int = typer.Option(8080, "--port", "-p", help="HTTP server port"),
+    no_watch: bool = typer.Option(False, "--no-watch", help="Disable watch mode"),
+) -> None:
+    """Build and serve WASM simulator."""
+    root = workspace_root()
 
-    _delegate_to_legacy(["run", *ctx.args])
+    try:
+        cb = resolve_codebase(codebase, root)
+        tools = get_tools()
+    except CodebaseNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.USER_ERROR)
+    except ToolNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.ENV_ERROR)
 
+    console.print(f"[bold]Building {codebase} (wasm)[/]")
+    code = serve_wasm(
+        cb,
+        tools=tools,
+        workspace=root,
+        bin_root=get_bin_root(),
+        build_root=get_build_root(),
+        port=port,
+        watch=not no_watch,
+    )
 
-@app.command(
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
-)
-def web(ctx: typer.Context) -> None:
-    """Serve WASM simulator (delegates to legacy for now)."""
-
-    _delegate_to_legacy(["web", *ctx.args])
-
-
-@app.command(
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
-)
-def build(ctx: typer.Context) -> None:
-    """Build targets (delegates to legacy for now)."""
-
-    _delegate_to_legacy(["build", *ctx.args])
-
-
-@app.command(
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
-)
-def upload(ctx: typer.Context) -> None:
-    """Upload teensy firmware (delegates to legacy for now)."""
-
-    _delegate_to_legacy(["upload", *ctx.args])
+    if code != 0:
+        raise typer.Exit(code=ExitCode.BUILD_ERROR)
 
 
-@app.command(
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
-)
-def monitor(ctx: typer.Context) -> None:
-    """Monitor serial output (delegates to legacy for now)."""
+@app.command()
+def build(
+    codebase: str = typer.Argument(..., help="Codebase: core, bitwig, ..."),
+    target: str = typer.Argument("", help="Target: native, wasm (default: teensy)"),
+    release: bool = typer.Option(False, "--release", help="Use release environment"),
+    raw: bool = typer.Option(False, "--raw", help="Use raw pio (skip oc-build)"),
+) -> None:
+    """Build targets (teensy, native, or wasm)."""
+    root = workspace_root()
+    env = "release" if release else "dev"
 
-    _delegate_to_legacy(["monitor", *ctx.args])
+    try:
+        cb = resolve_codebase(codebase, root)
+        tools = get_tools()
+    except CodebaseNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.USER_ERROR)
+    except ToolNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.ENV_ERROR)
+
+    if target == "native":
+        console.print(f"[bold]Building {codebase} (native)[/]")
+        code = build_native(
+            cb,
+            tools=tools,
+            workspace=root,
+            bin_root=get_bin_root(),
+            build_root=get_build_root(),
+        )
+    elif target == "wasm":
+        console.print(f"[bold]Building {codebase} (wasm)[/]")
+        code = build_wasm(
+            cb,
+            tools=tools,
+            workspace=root,
+            bin_root=get_bin_root(),
+            build_root=get_build_root(),
+        )
+    else:
+        # Default: teensy
+        console.print(f"[bold]Building {codebase} (teensy {env})[/]")
+        code = build_teensy(
+            cb,
+            env,
+            tools=tools,
+            bin_root=get_bin_root(),
+            raw=raw,
+        )
+
+    if code != 0:
+        raise typer.Exit(code=ExitCode.BUILD_ERROR)
+
+    console.print("Build complete", style="green")
 
 
-@app.command(
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
-)
-def clean(ctx: typer.Context) -> None:
-    """Clean build artifacts (delegates to legacy for now)."""
+@app.command()
+def upload(
+    codebase: str = typer.Argument(..., help="Codebase: core, bitwig, ..."),
+    release: bool = typer.Option(False, "--release", help="Use release environment"),
+    raw: bool = typer.Option(False, "--raw", help="Use raw pio (skip oc-upload)"),
+) -> None:
+    """Build and upload teensy firmware."""
+    root = workspace_root()
+    env = "release" if release else "dev"
 
-    _delegate_to_legacy(["clean", *ctx.args])
+    try:
+        cb = resolve_codebase(codebase, root)
+        tools = get_tools()
+    except CodebaseNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.USER_ERROR)
+    except ToolNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.ENV_ERROR)
+
+    console.print(f"[bold]Uploading {codebase} (teensy {env})[/]")
+    code = upload_teensy(
+        cb,
+        env,
+        tools=tools,
+        bin_root=get_bin_root(),
+        raw=raw,
+    )
+
+    if code != 0:
+        raise typer.Exit(code=ExitCode.BUILD_ERROR)
+
+    console.print("Upload complete", style="green")
 
 
-@app.command(
-    name="list",
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
-)
-def list_cmd(ctx: typer.Context) -> None:
-    """List codebases (delegates to legacy for now)."""
+@app.command()
+def monitor(
+    codebase: str = typer.Argument(..., help="Codebase: core, bitwig, ..."),
+    release: bool = typer.Option(False, "--release", help="Use release environment"),
+    raw: bool = typer.Option(False, "--raw", help="Use raw pio (skip oc-monitor)"),
+) -> None:
+    """Monitor serial output."""
+    root = workspace_root()
+    env = "release" if release else "dev"
 
-    _delegate_to_legacy(["list", *ctx.args])
+    try:
+        cb = resolve_codebase(codebase, root)
+        tools = get_tools()
+    except CodebaseNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.USER_ERROR)
+    except ToolNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.ENV_ERROR)
+
+    console.print(f"[bold]Monitoring {codebase} (teensy {env})[/]")
+    code = monitor_teensy(
+        cb,
+        env,
+        tools=tools,
+        raw=raw,
+    )
+
+    if code != 0:
+        raise typer.Exit(code=ExitCode.BUILD_ERROR)
+
+
+@app.command()
+def clean(
+    codebase: str = typer.Argument("", help="Codebase to clean (all if empty)"),
+) -> None:
+    """Clean build artifacts."""
+    root = workspace_root()
+    bin_root = get_bin_root()
+    build_root = get_build_root()
+    midi_studio = root / "midi-studio"
+
+    if not codebase:
+        # Clean all
+        console.print("Cleaning all builds...")
+
+        if build_root.exists():
+            shutil.rmtree(build_root)
+
+        if bin_root.exists():
+            for cb_dir in bin_root.iterdir():
+                if not cb_dir.is_dir():
+                    continue
+                # Don't clean bridge
+                if cb_dir.name == "bridge":
+                    continue
+                for subdir in ["native", "wasm", "teensy"]:
+                    target = cb_dir / subdir
+                    if target.exists():
+                        shutil.rmtree(target)
+
+        # Clean PlatformIO builds
+        for pio_build in midi_studio.glob("*/.pio/build"):
+            shutil.rmtree(pio_build)
+    else:
+        # Clean specific codebase
+        try:
+            cb = resolve_codebase(codebase, root)
+        except CodebaseNotFoundError as e:
+            console.print(f"error: {e}", style="red")
+            raise typer.Exit(code=ExitCode.USER_ERROR)
+
+        console.print(f"Cleaning {codebase}...")
+
+        cb_build = build_root / codebase
+        if cb_build.exists():
+            shutil.rmtree(cb_build)
+
+        cb_bin = bin_root / codebase
+        for subdir in ["native", "wasm", "teensy"]:
+            target = cb_bin / subdir
+            if target.exists():
+                shutil.rmtree(target)
+
+        pio_build = cb.path / ".pio" / "build"
+        if pio_build.exists():
+            shutil.rmtree(pio_build)
+
+    console.print("Clean complete", style="green")
+
+
+@app.command(name="list")
+def list_cmd() -> None:
+    """List available codebases."""
+    root = workspace_root()
+    codebases = list_codebases(root)
+
+    console.print("[bold]Available codebases:[/]")
+    for cb in codebases:
+        console.print(f"  {cb}")
 
 
 @app.command(
@@ -987,29 +1218,92 @@ def bridge(ctx: typer.Context) -> None:
     os.execv(str(exe), [str(exe), *ctx.args])
 
 
-@app.command(
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
-)
-def core(ctx: typer.Context) -> None:
-    """Quick upload for core (delegates to legacy for now)."""
+@app.command()
+def core(
+    release: bool = typer.Option(False, "--release", help="Use release environment"),
+    raw: bool = typer.Option(False, "--raw", help="Use raw pio (skip oc-upload)"),
+) -> None:
+    """Quick upload for core (teensy)."""
+    root = workspace_root()
+    env = "release" if release else "dev"
 
-    _delegate_to_legacy(["core", *ctx.args])
+    try:
+        cb = resolve_codebase("core", root)
+        tools = get_tools()
+    except CodebaseNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.USER_ERROR)
+    except ToolNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.ENV_ERROR)
 
+    console.print(f"[bold]Uploading core (teensy {env})[/]")
+    code = upload_teensy(
+        cb,
+        env,
+        tools=tools,
+        bin_root=get_bin_root(),
+        raw=raw,
+    )
 
-@app.command(
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
-)
-def bitwig(ctx: typer.Context) -> None:
-    """Quick upload for bitwig (delegates to legacy for now)."""
+    if code != 0:
+        raise typer.Exit(code=ExitCode.BUILD_ERROR)
 
-    _delegate_to_legacy(["bitwig", *ctx.args])
+    console.print("Upload complete", style="green")
 
 
 @app.command()
-def setup() -> None:
-    """Project setup (build bridge + extension)."""
+def bitwig(
+    release: bool = typer.Option(False, "--release", help="Use release environment"),
+    raw: bool = typer.Option(False, "--raw", help="Use raw pio (skip oc-upload)"),
+) -> None:
+    """Quick upload for bitwig (teensy)."""
+    root = workspace_root()
+    env = "release" if release else "dev"
+
+    try:
+        cb = resolve_codebase("bitwig", root)
+        tools = get_tools()
+    except CodebaseNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.USER_ERROR)
+    except ToolNotFoundError as e:
+        console.print(f"error: {e}", style="red")
+        raise typer.Exit(code=ExitCode.ENV_ERROR)
+
+    console.print(f"[bold]Uploading bitwig (teensy {env})[/]")
+    code = upload_teensy(
+        cb,
+        env,
+        tools=tools,
+        bin_root=get_bin_root(),
+        raw=raw,
+    )
+
+    if code != 0:
+        raise typer.Exit(code=ExitCode.BUILD_ERROR)
+
+    console.print("Upload complete", style="green")
+
+
+@app.command()
+def setup(
+    bootstrap: bool = typer.Option(
+        False, "--bootstrap", help="Full bootstrap (install tools)"
+    ),
+    skip_system_check: bool = typer.Option(
+        False, "--skip-system-check", help="Skip system deps check"
+    ),
+) -> None:
+    """Project setup (build bridge + extension, or --bootstrap for full install)."""
 
     root = workspace_root()
+
+    if bootstrap:
+        from .setup_bootstrap import run_bootstrap
+
+        code = run_bootstrap(root, skip_system_check=skip_system_check)
+        raise typer.Exit(code=code)
     platform_id = detect_platform()
     cfg = load_config(root / "config.toml")
 
@@ -1065,62 +1359,81 @@ def setup() -> None:
     if not (host_dir / "pom.xml").exists():
         console.print(f"host dir missing: {host_dir}", style="red")
         failed = True
-    elif which("mvn") is None:
-        console.print("mvn: missing", style="red")
-        failed = True
     else:
-        bitwig_dir = cfg.raw.get("bitwig", {}).get(platform_id)
-        candidates: list[Path] = []
-        if bitwig_dir:
-            candidates.append(Path(str(bitwig_dir)).expanduser())
-        else:
-            home = Path.home()
-            if platform_id == "linux":
-                candidates.extend(
-                    [
-                        home / "Bitwig Studio" / "Extensions",
-                        home / ".BitwigStudio" / "Extensions",
-                    ]
-                )
-            elif platform_id in {"macos", "windows"}:
-                candidates.append(home / "Documents" / "Bitwig Studio" / "Extensions")
-
-        install_dir = next((p for p in candidates if p.exists()), None)
-        if install_dir is None and candidates:
-            install_dir = candidates[0]
-
-        if install_dir is None:
-            console.print("bitwig extensions dir not found", style="red")
+        # Find mvn using ToolResolver
+        tools = get_tools()
+        try:
+            mvn_path = tools.mvn()
+        except ToolNotFoundError:
+            console.print("mvn: missing", style="red")
             failed = True
-        else:
-            install_dir.mkdir(parents=True, exist_ok=True)
+            mvn_path = None
 
-            # JDK 25 is installed, but compile in Java 21 compatibility.
-            cmd = [
-                "mvn",
-                "package",
-                "-Dmaven.compiler.release=21",
-                f"-Dbitwig.extensions.dir={install_dir}",
-            ]
-            code = run_live(cmd, cwd=host_dir)
-            if code != 0:
-                console.print("maven build failed", style="red")
-                raise typer.Exit(code=ExitCode.BUILD_ERROR)
+        if mvn_path:
+            bitwig_dir = cfg.raw.get("bitwig", {}).get(platform_id)
+            candidates: list[Path] = []
+            if bitwig_dir:
+                candidates.append(Path(str(bitwig_dir)).expanduser())
+            else:
+                home = Path.home()
+                if platform_id == "linux":
+                    candidates.extend(
+                        [
+                            home / "Bitwig Studio" / "Extensions",
+                            home / ".BitwigStudio" / "Extensions",
+                        ]
+                    )
+                elif platform_id in {"macos", "windows"}:
+                    candidates.append(
+                        home / "Documents" / "Bitwig Studio" / "Extensions"
+                    )
 
-            deployed = install_dir / "midi_studio.bwextension"
-            if not deployed.exists():
-                console.print(f"extension not found: {deployed}", style="red")
+            install_dir = next((p for p in candidates if p.exists()), None)
+            if install_dir is None and candidates:
+                install_dir = candidates[0]
+
+            if install_dir is None:
+                console.print("bitwig extensions dir not found", style="red")
                 failed = True
             else:
-                console.print(f"extension: {deployed}", style="green")
+                install_dir.mkdir(parents=True, exist_ok=True)
 
-                # Keep a copy in workspace/bin/bitwig for convenience.
-                bin_bitwig_dir = root / "bin" / "bitwig"
-                bin_bitwig_dir.mkdir(parents=True, exist_ok=True)
-                try:
-                    shutil.copy2(deployed, bin_bitwig_dir / deployed.name)
-                except Exception:
-                    pass
+                # JDK 25 is installed, but compile in Java 21 compatibility.
+                # Also set JAVA_HOME to bundled JDK
+                java_home = tools.tools_dir / "jdk"
+                env = os.environ.copy()
+                env["JAVA_HOME"] = str(java_home)
+
+                from .tools import run_tool
+
+                result = run_tool(
+                    mvn_path,
+                    [
+                        "package",
+                        "-Dmaven.compiler.release=21",
+                        f"-Dbitwig.extensions.dir={install_dir}",
+                    ],
+                    cwd=host_dir,
+                    env=env,
+                )
+                if result.returncode != 0:
+                    console.print("maven build failed", style="red")
+                    raise typer.Exit(code=ExitCode.BUILD_ERROR)
+
+                deployed = install_dir / "midi_studio.bwextension"
+                if not deployed.exists():
+                    console.print(f"extension not found: {deployed}", style="red")
+                    failed = True
+                else:
+                    console.print(f"extension: {deployed}", style="green")
+
+                    # Keep a copy in workspace/bin/bitwig for convenience.
+                    bin_bitwig_dir = root / "bin" / "bitwig"
+                    bin_bitwig_dir.mkdir(parents=True, exist_ok=True)
+                    try:
+                        shutil.copy2(deployed, bin_bitwig_dir / deployed.name)
+                    except Exception:
+                        pass
 
     console.print("")
     if failed:
@@ -1342,31 +1655,30 @@ def completion(shell: str = typer.Argument("bash", help="Shell: bash|zsh")) -> N
     raise typer.Exit(code=ExitCode.USER_ERROR)
 
 
-@app.command(
-    name="r",
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
-)
-def alias_run(ctx: typer.Context) -> None:
+@app.command(name="r")
+def alias_run(
+    codebase: str = typer.Argument(..., help="Codebase: core, bitwig, ..."),
+) -> None:
     """Alias for run."""
+    run_cmd(codebase)
 
-    _delegate_to_legacy(["run", *ctx.args])
 
-
-@app.command(
-    name="w",
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
-)
-def alias_web(ctx: typer.Context) -> None:
+@app.command(name="w")
+def alias_web(
+    codebase: str = typer.Argument(..., help="Codebase: core, bitwig, ..."),
+    port: int = typer.Option(8080, "--port", "-p", help="HTTP server port"),
+    no_watch: bool = typer.Option(False, "--no-watch", help="Disable watch mode"),
+) -> None:
     """Alias for web."""
+    web(codebase, port, no_watch)
 
-    _delegate_to_legacy(["web", *ctx.args])
 
-
-@app.command(
-    name="b",
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
-)
-def alias_build(ctx: typer.Context) -> None:
+@app.command(name="b")
+def alias_build(
+    codebase: str = typer.Argument(..., help="Codebase: core, bitwig, ..."),
+    target: str = typer.Argument("", help="Target: native, wasm (default: teensy)"),
+    release: bool = typer.Option(False, "--release", help="Use release environment"),
+    raw: bool = typer.Option(False, "--raw", help="Use raw pio (skip oc-build)"),
+) -> None:
     """Alias for build."""
-
-    _delegate_to_legacy(["build", *ctx.args])
+    build(codebase, target, release, raw)
