@@ -1,0 +1,14 @@
+* text=auto
+
+# Ensure bash scripts don't get CRLF on Windows
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+commands/ms text eol=lf
+commands/_ms_completions.bash text eol=lf
+commands/_ms_completions.zsh text eol=lf
+
+# Windows scripts
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf

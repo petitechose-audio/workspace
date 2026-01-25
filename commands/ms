@@ -6,27 +6,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 export WORKSPACE_ROOT
-export WORKSPACE_TOOLS="$WORKSPACE_ROOT/tools"
 
-# Prefer workspace-managed tools
-export PATH="$WORKSPACE_TOOLS/bin:$WORKSPACE_ROOT/commands:$WORKSPACE_ROOT/open-control/cli-tools/bin:$PATH"
+cd "$WORKSPACE_ROOT"
 
-if [[ -d "$WORKSPACE_TOOLS/jdk/Contents/Home" ]]; then
-  export JAVA_HOME="$WORKSPACE_TOOLS/jdk/Contents/Home"
-elif [[ -d "$WORKSPACE_TOOLS/jdk" ]]; then
-  export JAVA_HOME="$WORKSPACE_TOOLS/jdk"
-fi
-
-PYTHON_BIN="$WORKSPACE_ROOT/.venv/bin/python"
-if [[ -f "$WORKSPACE_ROOT/.venv/Scripts/python.exe" ]]; then
-  PYTHON_BIN="$WORKSPACE_ROOT/.venv/Scripts/python.exe"
-fi
-
-if [[ ! -x "$PYTHON_BIN" ]]; then
-  echo "error: Python venv not found: $WORKSPACE_ROOT/.venv" >&2
-  echo "hint: run ./setup.sh" >&2
+if ! command -v uv >/dev/null 2>&1; then
+  echo "error: uv not found in PATH" >&2
+  echo "install: https://docs.astral.sh/uv/" >&2
   exit 2
 fi
 
-cd "$WORKSPACE_ROOT"
-exec "$PYTHON_BIN" -m ms_cli "$@"
+exec uv run ms "$@"

@@ -14,7 +14,10 @@ node_modules/
 macros.bin
 
 # Downloaded tools (platform-specific binaries)
-tools/
+/tools/
+
+# Workspace state (mode, locks, caches)
+.ms/
 
 # Python (workspace venv)
 .venv/
@@ -28,6 +31,10 @@ bin/
 .idea/
 *.swp
 *.swo
+
+# Local tooling
+.claude/
+*.egg-info/
 
 # OS
 .DS_Store

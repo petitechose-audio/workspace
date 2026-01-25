@@ -2,12 +2,12 @@
 
 _ms() {
   local -a commands
-  local -a codebases
-  local -a build_targets
+  local -a repos_subcommands
+  local -a tools_subcommands
 
-  commands=(doctor verify update setup bridge run web build upload monitor clean list completion icons changes status help r w b core bitwig)
-  codebases=(core bitwig)
-  build_targets=(teensy native wasm)
+  commands=(check setup repos tools)
+  repos_subcommands=(sync)
+  tools_subcommands=(sync)
 
   if (( CURRENT == 2 )); then
     _describe -t commands 'ms command' commands
@@ -16,22 +16,12 @@ _ms() {
 
   local cmd=${words[2]}
   case $cmd in
-    run|web|upload|monitor|clean|icons)
-      _describe -t codebases 'codebase' codebases
+    repos)
+      _describe -t repos_subcommands 'repos command' repos_subcommands
       return
       ;;
-    build)
-      if (( CURRENT == 3 )); then
-        _describe -t codebases 'codebase' codebases
-        return
-      fi
-      if (( CURRENT == 4 )); then
-        _describe -t build_targets 'target' build_targets
-        return
-      fi
-      ;;
-    completion)
-      _values 'shell' bash zsh
+    tools)
+      _describe -t tools_subcommands 'tools command' tools_subcommands
       return
       ;;
   esac
