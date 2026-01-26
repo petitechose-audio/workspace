@@ -1,0 +1,50 @@
+"""Shared helpers for CLI commands."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, NoReturn, cast
+
+import typer
+
+from ms.core.errors import ErrorCode
+from ms.output.console import Style
+
+if TYPE_CHECKING:
+    from ms.cli.context import CLIContext
+
+
+def exit_on_error(
+    result: Any,  # Result[T, E] - use Any to avoid invariance issues
+    ctx: CLIContext,
+    error_code: ErrorCode = ErrorCode.BUILD_ERROR,
+) -> None:
+    """Exit with error if result is Err, otherwise return.
+
+    This helper reduces boilerplate for the common pattern:
+        match result:
+            case Err(e):
+                ctx.console.error(e.message)
+                if e.hint:
+                    ctx.console.print(f"hint: {e.hint}", Style.DIM)
+                raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))
+            case Ok(_):
+                pass
+
+    Expects error objects to have 'message' and optional 'hint' attributes.
+    """
+    from ms.core.result import Err
+
+    if isinstance(result, Err):
+        err = cast(Err[object], result)
+        error = err.error
+        message: str = getattr(error, "message", str(error))
+        hint: str | None = getattr(error, "hint", None)
+        ctx.console.error(message)
+        if hint:
+            ctx.console.print(f"hint: {hint}", Style.DIM)
+        raise typer.Exit(code=int(error_code))
+
+
+def exit_with_code(code: int) -> NoReturn:
+    """Exit with given code. Explicit helper for clarity."""
+    raise typer.Exit(code=code)

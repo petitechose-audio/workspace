@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import shutil
+import stat
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -11,6 +14,26 @@ from rich.console import Console
 from ms.cli.context import build_context
 
 _console = Console()
+
+
+def _remove_readonly(_func: Any, path: str, exc: BaseException) -> None:
+    """Handle read-only files on Windows (e.g. .git/objects/pack/*.idx)."""
+    if isinstance(exc, PermissionError):
+        os.chmod(path, stat.S_IWRITE)
+        os.unlink(path)
+    else:
+        raise exc
+
+
+def _find_pio_dirs(parent: Path) -> list[Path]:
+    """Find all .pio directories in immediate subdirectories of parent."""
+    if not parent.exists():
+        return []
+    return [
+        d / ".pio"
+        for d in parent.iterdir()
+        if d.is_dir() and (d / ".pio").exists()
+    ]
 
 
 def clean(
@@ -21,15 +44,16 @@ def clean(
     ctx = build_context()
     ws = ctx.workspace
 
-    # Collect directories
+    # Collect directories - build artifacts
     dirs: list[Path] = [
         ws.build_dir,
         ws.platformio_dir,
         ws.state_dir / "platformio-cache",
         ws.state_dir / "platformio-build-cache",
-        ws.midi_studio_dir / "core" / ".pio",
-        ws.midi_studio_dir / "plugin-bitwig" / ".pio",
     ]
+
+    # Add all .pio directories from midi-studio apps (dynamic discovery)
+    dirs.extend(_find_pio_dirs(ws.midi_studio_dir))
 
     if all_:
         dirs.extend([ws.tools_dir, ws.cache_dir])
@@ -58,6 +82,6 @@ def clean(
 
     # Execute
     for d in existing:
-        shutil.rmtree(d)
+        shutil.rmtree(d, onexc=_remove_readonly)
 
     _console.print(f"\n[green]Removed {len(existing)} directories[/green]")

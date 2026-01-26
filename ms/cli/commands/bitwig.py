@@ -6,6 +6,7 @@ from enum import Enum, auto
 
 import typer
 
+from ms.cli.commands._helpers import exit_on_error, exit_with_code
 from ms.cli.context import build_context
 from ms.core.app import resolve
 from ms.core.errors import ErrorCode
@@ -19,31 +20,29 @@ from ms.services.hardware import HardwareService
 class Mode(Enum):
     """Build mode for bitwig app."""
 
-    HW_FULL = auto()  # build + upload + monitor (default)
-    HW_BUILD = auto()  # build only
-    HW_UPLOAD = auto()  # build + upload
+    EXTENSION = auto()  # build + deploy .bwextension
     SIM_NATIVE = auto()  # native simulator
     SIM_WEB = auto()  # wasm simulator
-    EXTENSION = auto()  # build + deploy .bwextension
+    HW_BUILD = auto()  # build only
+    HW_UPLOAD = auto()  # build + upload
+    HW_FULL = auto()  # build + upload + monitor (default)
 
 
 def _resolve_mode(
     build: bool, upload: bool, native: bool, web: bool, extension: bool
 ) -> Mode:
-    """Determine build mode from CLI flags."""
-    match (build, upload, native, web, extension):
-        case (_, _, _, _, True):
-            return Mode.EXTENSION
-        case (_, _, True, _, _):
-            return Mode.SIM_NATIVE
-        case (_, _, _, True, _):
-            return Mode.SIM_WEB
-        case (True, _, _, _, _):
-            return Mode.HW_BUILD
-        case (_, True, _, _, _):
-            return Mode.HW_UPLOAD
-        case _:
-            return Mode.HW_FULL
+    """Determine build mode from CLI flags (first match wins)."""
+    if extension:
+        return Mode.EXTENSION
+    if native:
+        return Mode.SIM_NATIVE
+    if web:
+        return Mode.SIM_WEB
+    if build:
+        return Mode.HW_BUILD
+    if upload:
+        return Mode.HW_UPLOAD
+    return Mode.HW_FULL
 
 
 def bitwig(
@@ -66,6 +65,7 @@ def bitwig(
     """
     ctx = build_context()
 
+    # Resolve app
     result = resolve("bitwig", ctx.workspace.root)
     match result:
         case Err(e):
@@ -78,84 +78,44 @@ def bitwig(
 
     mode = _resolve_mode(build, upload, native, web, extension)
 
+    # Extension mode (bitwig-specific)
+    if mode == Mode.EXTENSION:
+        bw = BitwigService(
+            workspace=ctx.workspace,
+            platform=ctx.platform,
+            config=ctx.config,
+            console=ctx.console,
+        )
+        exit_on_error(bw.deploy(dry_run=dry_run), ctx)
+        return
+
+    # Simulator modes
+    if mode in (Mode.SIM_NATIVE, Mode.SIM_WEB):
+        build_svc = BuildService(
+            workspace=ctx.workspace,
+            platform=ctx.platform,
+            config=ctx.config,
+            console=ctx.console,
+        )
+        if mode == Mode.SIM_NATIVE:
+            exit_with_code(build_svc.run_native(app_name="bitwig"))
+        else:
+            exit_with_code(build_svc.serve_wasm(app_name="bitwig"))
+
+    # Hardware modes
+    hw = HardwareService(
+        workspace=ctx.workspace,
+        platform=ctx.platform,
+        config=ctx.config,
+        console=ctx.console,
+    )
+
     match mode:
-        case Mode.EXTENSION:
-            bw = BitwigService(
-                workspace=ctx.workspace,
-                platform=ctx.platform,
-                config=ctx.config,
-                console=ctx.console,
-            )
-            result = bw.deploy(dry_run=dry_run)
-            match result:
-                case Err(e):
-                    ctx.console.error(e.message)
-                    if e.hint:
-                        ctx.console.print(f"hint: {e.hint}", Style.DIM)
-                    raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))
-                case Ok(_):
-                    pass
-
-        case Mode.SIM_NATIVE:
-            build_svc = BuildService(
-                workspace=ctx.workspace,
-                platform=ctx.platform,
-                config=ctx.config,
-                console=ctx.console,
-            )
-            code = build_svc.run_native(app_name="bitwig")
-            raise typer.Exit(code=code)
-
-        case Mode.SIM_WEB:
-            build_svc = BuildService(
-                workspace=ctx.workspace,
-                platform=ctx.platform,
-                config=ctx.config,
-                console=ctx.console,
-            )
-            code = build_svc.serve_wasm(app_name="bitwig")
-            raise typer.Exit(code=code)
-
         case Mode.HW_BUILD:
-            hw = HardwareService(
-                workspace=ctx.workspace,
-                platform=ctx.platform,
-                config=ctx.config,
-                console=ctx.console,
-            )
-            result = hw.build(app, dry_run=dry_run)
-            match result:
-                case Err(e):
-                    ctx.console.error(e.message)
-                    if e.hint:
-                        ctx.console.print(f"hint: {e.hint}", Style.DIM)
-                    raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))
-                case Ok(_):
-                    pass
+            exit_on_error(hw.build(app, dry_run=dry_run), ctx)
 
         case Mode.HW_UPLOAD:
-            hw = HardwareService(
-                workspace=ctx.workspace,
-                platform=ctx.platform,
-                config=ctx.config,
-                console=ctx.console,
-            )
-            result = hw.upload(app, dry_run=dry_run)
-            match result:
-                case Err(e):
-                    ctx.console.error(e.message)
-                    if e.hint:
-                        ctx.console.print(f"hint: {e.hint}", Style.DIM)
-                    raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))
-                case Ok(_):
-                    pass
+            exit_on_error(hw.upload(app, dry_run=dry_run), ctx)
 
         case Mode.HW_FULL:
-            hw = HardwareService(
-                workspace=ctx.workspace,
-                platform=ctx.platform,
-                config=ctx.config,
-                console=ctx.console,
-            )
-            code = hw.monitor(app)
-            raise typer.Exit(code=code)
+            exit_with_code(hw.monitor(app))

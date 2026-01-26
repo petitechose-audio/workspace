@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,22 +13,47 @@ from rich.text import Text
 from ms.cli.context import build_context
 from ms.core.result import Err, Ok
 from ms.git.repository import GitStatus, Repository
+from ms.platform.clipboard import copy_to_clipboard
 
 # Force UTF-8 for nice output
 _console = Console(force_terminal=True, legacy_windows=False)
 
 
-def _copy_to_clipboard(text: str) -> bool:
-    """Copy text to clipboard. Returns True on success."""
-    try:
-        # Windows
-        process = subprocess.Popen(
-            ["clip"], stdin=subprocess.PIPE, shell=True
+@dataclass(frozen=True, slots=True)
+class ChangeCounts:
+    """Counts of different change types."""
+
+    modified: int = 0
+    added: int = 0
+    deleted: int = 0
+    untracked: int = 0
+
+    @staticmethod
+    def from_status(st: GitStatus) -> ChangeCounts:
+        """Extract counts from GitStatus."""
+        return ChangeCounts(
+            modified=sum(1 for e in st.entries if e.xy[0] == "M" or e.xy[1] == "M"),
+            added=sum(1 for e in st.entries if e.xy[0] == "A"),
+            deleted=sum(1 for e in st.entries if e.xy[0] == "D" or e.xy[1] == "D"),
+            untracked=st.untracked_count,
         )
-        process.communicate(text.encode("utf-8"))
-        return process.returncode == 0
-    except Exception:
-        return False
+
+    def as_parts(self) -> list[tuple[str, str]]:
+        """Return (label, color) pairs for non-zero counts."""
+        parts: list[tuple[str, str]] = []
+        if self.modified:
+            parts.append((f"{self.modified}M", "yellow"))
+        if self.added:
+            parts.append((f"{self.added}A", "green"))
+        if self.deleted:
+            parts.append((f"{self.deleted}D", "red"))
+        if self.untracked:
+            parts.append((f"{self.untracked}?", "cyan"))
+        return parts
+
+    def as_string(self) -> str:
+        """Return space-separated count labels."""
+        return " ".join(label for label, _ in self.as_parts())
 
 
 @dataclass
@@ -50,6 +74,13 @@ class RepoStatus:
             or self.status.ahead > 0
             or self.status.behind > 0
         )
+
+    @property
+    def counts(self) -> ChangeCounts:
+        """Get change counts (returns empty counts if no status)."""
+        if self.status is None:
+            return ChangeCounts()
+        return ChangeCounts.from_status(self.status)
 
 
 def _collect_repos(root: Path, midi_studio: Path, open_control: Path) -> list[tuple[str, Path]]:
@@ -72,30 +103,13 @@ def _collect_repos(root: Path, midi_studio: Path, open_control: Path) -> list[tu
     return repos
 
 
-def _render_counts(st: GitStatus) -> Text:
+def _render_counts(counts: ChangeCounts) -> Text:
     """Render change counts with colors."""
     text = Text()
-
-    modified = sum(1 for e in st.entries if e.xy[0] == "M" or e.xy[1] == "M")
-    added = sum(1 for e in st.entries if e.xy[0] == "A")
-    deleted = sum(1 for e in st.entries if e.xy[0] == "D" or e.xy[1] == "D")
-    untracked = st.untracked_count
-
-    parts: list[tuple[str, str]] = []
-    if modified:
-        parts.append((f"{modified}M", "yellow"))
-    if added:
-        parts.append((f"{added}A", "green"))
-    if deleted:
-        parts.append((f"{deleted}D", "red"))
-    if untracked:
-        parts.append((f"{untracked}?", "cyan"))
-
-    for i, (count, color) in enumerate(parts):
+    for i, (label, color) in enumerate(counts.as_parts()):
         if i > 0:
             text.append(" ")
-        text.append(count, style=color)
-
+        text.append(label, style=color)
     return text
 
 
@@ -149,7 +163,7 @@ def _render_changed_repo(r: RepoStatus, detailed: bool) -> Text:
     # Line 3: branch + counts + divergence
     lines.append(st.branch or "?", style="blue")
     lines.append("  ")
-    lines.append_text(_render_counts(st))
+    lines.append_text(_render_counts(ChangeCounts.from_status(st)))
     div = _render_divergence(st)
     if div.plain:
         lines.append("  ")
@@ -183,25 +197,9 @@ def _generate_plain_text(
                 st = r.status
                 assert st is not None
 
-                # Counts
-                modified = sum(1 for e in st.entries if e.xy[0] == "M" or e.xy[1] == "M")
-                added = sum(1 for e in st.entries if e.xy[0] == "A")
-                deleted = sum(1 for e in st.entries if e.xy[0] == "D" or e.xy[1] == "D")
-                untracked = st.untracked_count
-
-                counts: list[str] = []
-                if modified:
-                    counts.append(f"{modified}M")
-                if added:
-                    counts.append(f"{added}A")
-                if deleted:
-                    counts.append(f"{deleted}D")
-                if untracked:
-                    counts.append(f"{untracked}?")
-
                 lines.append(f"{r.name}")
                 lines.append(f"{r.path}")
-                lines.append(f"{st.branch}  {' '.join(counts)}")
+                lines.append(f"{st.branch}  {r.counts.as_string()}")
 
                 if detailed and st.entries:
                     for entry in st.entries:
@@ -305,5 +303,5 @@ def status(
     # Copy to clipboard by default
     if not no_copy:
         plain = _generate_plain_text(changed, clean, detailed)
-        if _copy_to_clipboard(plain):
+        if copy_to_clipboard(plain):
             _console.print("\n[dim]Copied to clipboard[/dim]")
