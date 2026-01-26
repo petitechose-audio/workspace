@@ -9,14 +9,14 @@ from ms.services.setup import SetupService
 
 
 def setup(
-    mode: str = typer.Option("dev", "--mode", help="Setup mode (dev only for now)."),
+    mode: str = typer.Option("dev", "--mode", help="Setup mode (dev only)"),
     skip_repos: bool = typer.Option(False, "--skip-repos"),
     skip_tools: bool = typer.Option(False, "--skip-tools"),
     skip_python: bool = typer.Option(False, "--skip-python"),
     skip_check: bool = typer.Option(False, "--skip-check"),
     dry_run: bool = typer.Option(False, "--dry-run"),
 ) -> None:
-    """Prepare a dev workspace (repos + tools + python deps)."""
+    """Setup dev workspace."""
     ctx = build_context()
     service = SetupService(
         workspace=ctx.workspace,

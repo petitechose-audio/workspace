@@ -3,13 +3,15 @@ from __future__ import annotations
 import typer
 
 from ms import __version__
-from ms.cli.commands.build import build, run, web
-from ms.cli.commands.bitwig import bitwig_app
-from ms.cli.commands.bridge import bridge_app
+from ms.cli.commands.bitwig import bitwig
+from ms.cli.commands.bridge import bridge
 from ms.cli.commands.check import check
-from ms.cli.commands.repos import repos_app
+from ms.cli.commands.clean import clean
+from ms.cli.commands.core import core
 from ms.cli.commands.setup import setup
-from ms.cli.commands.tools import tools_app
+from ms.cli.commands.status import status
+from ms.cli.commands.sync import sync
+from ms.cli.commands.tools import tools
 
 
 app = typer.Typer(
@@ -22,13 +24,13 @@ app = typer.Typer(
 # Commands
 app.command()(check)
 app.command()(setup)
-app.command()(build)
-app.command(name="run")(run)
-app.command()(web)
-app.add_typer(repos_app, name="repos")
-app.add_typer(tools_app, name="tools")
-app.add_typer(bridge_app, name="bridge")
-app.add_typer(bitwig_app, name="bitwig")
+app.command()(sync)
+app.command()(tools)
+app.command()(status)
+app.command()(clean)
+app.command()(core)
+app.command()(bitwig)
+app.command()(bridge)
 
 
 @app.callback()

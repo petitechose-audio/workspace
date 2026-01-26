@@ -135,3 +135,7 @@ class BridgeService:
     def _installed_bridge_bin(self) -> Path:
         exe_name = self._platform.platform.exe_name("oc-bridge")
         return self._workspace.bin_dir / "bridge" / exe_name
+
+    def is_installed(self) -> bool:
+        """Check if bridge binary is installed."""
+        return self._installed_bridge_bin().exists()

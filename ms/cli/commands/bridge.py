@@ -1,3 +1,5 @@
+"""Bridge command - build and run oc-bridge."""
+
 from __future__ import annotations
 
 import typer
@@ -9,15 +11,10 @@ from ms.output.console import Style
 from ms.services.bridge import BridgeService
 
 
-bridge_app = typer.Typer(no_args_is_help=True)
-
-
-@bridge_app.command("build")
-def build(
-    release: bool = typer.Option(True, "--release/--debug", help="Build release (default)."),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Print actions without modifying."),
+def bridge(
+    build: bool = typer.Option(False, "--build", help="Force rebuild"),
 ) -> None:
-    """Build and install oc-bridge into bin/bridge/."""
+    """Run bridge (builds if needed)."""
     ctx = build_context()
     service = BridgeService(
         workspace=ctx.workspace,
@@ -25,29 +22,19 @@ def build(
         config=ctx.config,
         console=ctx.console,
     )
-    result = service.build(release=release, dry_run=dry_run)
-    match result:
-        case Ok(_):
-            pass
-        case Err(e):
-            ctx.console.error(e.message)
-            if e.hint:
-                ctx.console.print(f"hint: {e.hint}", Style.DIM)
-            raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))
 
+    needs_build = build or not service.is_installed()
 
-@bridge_app.command(
-    "run",
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
-)
-def run(ctx: typer.Context) -> None:
-    """Run oc-bridge (TUI by default)."""
-    cli = build_context()
-    service = BridgeService(
-        workspace=cli.workspace,
-        platform=cli.platform,
-        config=cli.config,
-        console=cli.console,
-    )
-    code = service.run(args=list(ctx.args))
+    if needs_build:
+        result = service.build()
+        match result:
+            case Err(e):
+                ctx.console.error(e.message)
+                if e.hint:
+                    ctx.console.print(f"hint: {e.hint}", Style.DIM)
+                raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))
+            case Ok(_):
+                pass
+
+    code = service.run(args=[])
     raise typer.Exit(code=code)

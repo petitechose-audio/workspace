@@ -1,37 +1,21 @@
+"""Tools command - list installed tools."""
+
 from __future__ import annotations
 
-import typer
-
 from ms.cli.context import build_context
-from ms.core.errors import ErrorCode
-from ms.core.result import Err, Ok
-from ms.services.toolchains import ToolchainService
+from ms.output.console import Style
+from ms.tools.state import load_state
 
 
-tools_app = typer.Typer(no_args_is_help=True)
-
-
-@tools_app.command("sync")
-def sync(
-    dry_run: bool = typer.Option(False, "--dry-run", help="Print actions without modifying."),
-    force: bool = typer.Option(
-        False,
-        "--force",
-        help="Reinstall pinned toolchains even if already installed.",
-    ),
-) -> None:
-    """Install/update dev toolchains into tools/."""
+def tools() -> None:
+    """List installed tools."""
     ctx = build_context()
-    service = ToolchainService(
-        workspace=ctx.workspace,
-        platform=ctx.platform,
-        config=ctx.config,
-        console=ctx.console,
-    )
-    result = service.sync_dev(dry_run=dry_run, force=force)
-    match result:
-        case Ok(_):
-            pass
-        case Err(e):
-            ctx.console.error(f"toolchain sync failed: {e.message}")
-            raise typer.Exit(code=int(ErrorCode.ENV_ERROR))
+    state = load_state(ctx.workspace.tools_dir)
+
+    if not state:
+        ctx.console.print("No tools installed", Style.DIM)
+        ctx.console.print("hint: Run: ms sync --tools", Style.DIM)
+        return
+
+    for tool_id, tool_state in sorted(state.items()):
+        ctx.console.print(f"{tool_id}: {tool_state.version}")
