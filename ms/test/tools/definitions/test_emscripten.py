@@ -97,21 +97,17 @@ class TestEmscriptenToolBinPath:
 class TestEmscriptenToolPaths:
     """Tests for EmscriptenTool helper paths."""
 
-    def test_emcmake_path_unix(self) -> None:
-        """emcmake path on Unix."""
+    def test_emcmake_path_always_py(self) -> None:
+        """emcmake path always returns .py (invoked via sys.executable)."""
         tool = EmscriptenTool()
 
-        path = tool.emcmake_path(Path("/tools"), Platform.LINUX)
-
-        assert path == Path("/tools/emsdk/upstream/emscripten/emcmake")
-
-    def test_emcmake_path_windows(self) -> None:
-        """emcmake path on Windows."""
-        tool = EmscriptenTool()
-
-        path = tool.emcmake_path(Path("/tools"), Platform.WINDOWS)
-
-        assert path == Path("/tools/emsdk/upstream/emscripten/emcmake.bat")
+        # Same result regardless of platform since we invoke via Python
+        assert tool.emcmake_path(Path("/tools"), Platform.LINUX) == Path(
+            "/tools/emsdk/upstream/emscripten/emcmake.py"
+        )
+        assert tool.emcmake_path(Path("/tools"), Platform.WINDOWS) == Path(
+            "/tools/emsdk/upstream/emscripten/emcmake.py"
+        )
 
     def test_emsdk_path_unix(self) -> None:
         """emsdk script path on Unix."""

@@ -21,6 +21,7 @@ class ErrorCode(IntEnum):
     - 3: Build error (compilation failed, tests failed)
     - 4: Network error (download failed, API unreachable)
     - 5: I/O error (file not found, permission denied)
+    - 6: Internal error (unexpected application error)
     """
 
     OK = 0
@@ -29,6 +30,7 @@ class ErrorCode(IntEnum):
     BUILD_ERROR = 3
     NETWORK_ERROR = 4
     IO_ERROR = 5
+    INTERNAL_ERROR = 6
 
     def __str__(self) -> str:
         """Return human-readable name."""

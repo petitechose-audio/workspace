@@ -264,11 +264,11 @@ def generate_activation_scripts(
     result["bash"] = bash_path
 
     # Make bash script executable on Unix
-    if str(platform).lower() != "windows":
+    if not platform.is_windows:
         bash_path.chmod(0o755)
 
     # Generate Windows scripts
-    if str(platform).lower() == "windows":
+    if platform.is_windows:
         # PowerShell
         ps_path = tools_dir / "activate.ps1"
         ps_content = generate_powershell_activate(tools_dir, env_vars, path_additions)

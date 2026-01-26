@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ms.core.result import Err, Ok, Result
+from ms.platform.detection import Arch, Platform
 from ms.tools.api import adoptium_jdk_url
 from ms.tools.base import Mode, Tool, ToolSpec
 from ms.tools.http import HttpError
@@ -19,22 +20,24 @@ from ms.tools.http import HttpError
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ms.platform.detection import Arch, Platform
     from ms.tools.http import HttpClient
 
-__all__ = ["JdkTool"]
+__all__ = ["JdkTool", "DEFAULT_JDK_MAJOR"]
+
+# Default JDK major version (latest LTS)
+DEFAULT_JDK_MAJOR = 25
 
 
 # Platform mapping for Adoptium API
-_ADOPTIUM_OS: dict[str, str] = {
-    "linux": "linux",
-    "macos": "mac",
-    "windows": "windows",
+_ADOPTIUM_OS: dict[Platform, str] = {
+    Platform.LINUX: "linux",
+    Platform.MACOS: "mac",
+    Platform.WINDOWS: "windows",
 }
 
-_ADOPTIUM_ARCH: dict[str, str] = {
-    "x64": "x64",
-    "arm64": "aarch64",
+_ADOPTIUM_ARCH: dict[Arch, str] = {
+    Arch.X64: "x64",
+    Arch.ARM64: "aarch64",
 }
 
 
@@ -58,8 +61,8 @@ class JdkTool(Tool):
         version_args=("-version",),  # java -version
     )
 
-    # Default JDK major version
-    major_version: int = 21
+    # JDK major version (configurable via toolchains.toml)
+    major_version: int = DEFAULT_JDK_MAJOR
 
     # Cache for download URL (set by latest_version)
     _cached_url: str | None = None
@@ -67,11 +70,11 @@ class JdkTool(Tool):
 
     def _get_adoptium_os(self, platform: Platform) -> str | None:
         """Get Adoptium OS string."""
-        return _ADOPTIUM_OS.get(str(platform).lower())
+        return _ADOPTIUM_OS.get(platform)
 
     def _get_adoptium_arch(self, arch: Arch) -> str | None:
         """Get Adoptium architecture string."""
-        return _ADOPTIUM_ARCH.get(str(arch).lower())
+        return _ADOPTIUM_ARCH.get(arch)
 
     def latest_version(self, http: HttpClient) -> Result[str, HttpError]:
         """Fetch latest JDK version from Adoptium.

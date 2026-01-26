@@ -55,7 +55,7 @@ class ZigTool(GitHubTool):
         arch_str = "aarch64" if arch == A.ARM64 else "x86_64"
         plat_map = {P.WINDOWS: "windows", P.LINUX: "linux", P.MACOS: "macos"}
         ext = "zip" if platform == P.WINDOWS else "tar.xz"
-        return f"https://ziglang.org/download/{version}/zig-{plat_map[platform]}-{arch_str}-{version}.{ext}"
+        return f"https://ziglang.org/download/{version}/zig-{arch_str}-{plat_map[platform]}-{version}.{ext}"
 
     def asset_name(self, version: str, platform: Platform, arch: Arch) -> str:
         """Get asset filename for platform/arch."""
@@ -65,7 +65,7 @@ class ZigTool(GitHubTool):
         arch_str = "aarch64" if arch == A.ARM64 else "x86_64"
         plat_map = {P.WINDOWS: "windows", P.LINUX: "linux", P.MACOS: "macos"}
         ext = "zip" if platform == P.WINDOWS else "tar.xz"
-        return f"zig-{plat_map[platform]}-{arch_str}-{version}.{ext}"
+        return f"zig-{arch_str}-{plat_map[platform]}-{version}.{ext}"
 
     def strip_components(self) -> int:
         """Zig archives have a root directory to strip."""

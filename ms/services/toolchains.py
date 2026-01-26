@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 from ms.core.config import Config
+from ms.core.result import Err, Ok, Result
 from ms.core.workspace import Workspace
 from ms.output.console import ConsoleProtocol, Style
 from ms.platform.detection import PlatformInfo
+from ms.platform.process import run as run_process, run_silent
 from ms.platform.shell import generate_activation_scripts
 from ms.tools.download import Downloader
 from ms.tools.http import RealHttpClient
 from ms.tools.installer import Installer
 from ms.tools.pins import ToolPins
 from ms.tools.registry import ToolRegistry
-from ms.core.result import Err
 from ms.tools.state import get_installed_version, set_installed_version
 from ms.tools.wrapper import (
     WrapperGenerator,
@@ -24,6 +24,19 @@ from ms.tools.wrapper import (
     create_emscripten_wrappers,
     create_zig_wrappers,
 )
+
+# -----------------------------------------------------------------------------
+# Error Types
+# -----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ToolchainError:
+    """Error from toolchain sync operations."""
+
+    kind: Literal["sync_failed"]
+    message: str
+    hint: str | None = None
 
 
 @runtime_checkable
@@ -75,14 +88,16 @@ class ToolchainService:
             arch=platform.arch,
         )
 
-    def sync_dev(self, *, dry_run: bool = False, force: bool = False) -> bool:
+    def sync_dev(
+        self, *, dry_run: bool = False, force: bool = False
+    ) -> Result[None, ToolchainError]:
         pins_path = Path(__file__).parent.parent / "data" / "toolchains.toml"
         pins = ToolPins.load(pins_path)
 
         self._paths.tools_dir.mkdir(parents=True, exist_ok=True)
         self._paths.bin_dir.mkdir(parents=True, exist_ok=True)
 
-        ok = True
+        has_errors = False
 
         http = RealHttpClient()
         downloader = Downloader(http, self._paths.cache_downloads)
@@ -96,7 +111,7 @@ class ToolchainService:
 
             if tool.spec.id == "platformio":
                 if not self._ensure_platformio(pins.platformio_version, dry_run=dry_run):
-                    ok = False
+                    has_errors = True
                 continue
 
             # Special-case JDK: install via Adoptium direct link.
@@ -112,8 +127,10 @@ class ToolchainService:
                 ):
                     continue
 
-                if not self._install_jdk(http=http, downloader=downloader, installer=installer):
-                    ok = False
+                if not self._install_jdk(
+                    http=http, downloader=downloader, installer=installer, pins=pins
+                ):
+                    has_errors = True
                 continue
 
             version = pins.versions.get(tool.spec.id, "latest")
@@ -128,7 +145,7 @@ class ToolchainService:
                             f"{tool.spec.id}: failed to resolve version", Style.ERROR
                         )
                         self._console.print(str(vres.error), Style.DIM)
-                        ok = False
+                        has_errors = True
                         continue
                     version = vres.value
 
@@ -147,13 +164,13 @@ class ToolchainService:
                 url = tool.download_url(version, self._platform.platform, self._platform.arch)
             except Exception as e:  # noqa: BLE001
                 self._console.print(f"{tool.spec.id}: download URL error: {e}", Style.ERROR)
-                ok = False
+                has_errors = True
                 continue
 
             # Git-based install (emsdk)
             if isinstance(tool, _GitInstallTool) and tool.uses_git_install():
                 if not self._install_git_tool(tool, dry_run=dry_run):
-                    ok = False
+                    has_errors = True
                 else:
                     set_installed_version(self._paths.tools_dir, tool.spec.id, version)
                 continue
@@ -163,7 +180,7 @@ class ToolchainService:
             if isinstance(dres, Err):
                 self._console.print(f"{tool.spec.id}: download failed", Style.ERROR)
                 self._console.print(str(dres.error), Style.DIM)
-                ok = False
+                has_errors = True
                 continue
 
             install_dir = self._paths.tools_dir / tool.install_dir_name()
@@ -175,7 +192,7 @@ class ToolchainService:
             if isinstance(ires, Err):
                 self._console.print(f"{tool.spec.id}: install failed", Style.ERROR)
                 self._console.print(str(ires.error), Style.DIM)
-                ok = False
+                has_errors = True
                 continue
 
             tool.post_install(install_dir, self._platform.platform)
@@ -187,7 +204,7 @@ class ToolchainService:
         # Activation scripts
         if not dry_run:
             env_vars = self._registry.get_env_vars()
-            env_vars.update(self._platformio_env_vars())
+            env_vars.update(self._workspace.platformio_env_vars())
             path_additions = [self._paths.bin_dir, *self._registry.get_path_additions()]
             generate_activation_scripts(
                 self._paths.tools_dir,
@@ -196,7 +213,14 @@ class ToolchainService:
                 self._platform.platform,
             )
 
-        return ok
+        if has_errors:
+            return Err(
+                ToolchainError(
+                    kind="sync_failed",
+                    message="some tools failed to install",
+                )
+            )
+        return Ok(None)
 
     def _is_installed_at_version(self, tool_id: str, version: str) -> bool:
         current = get_installed_version(self._paths.tools_dir, tool_id)
@@ -212,8 +236,7 @@ class ToolchainService:
             create_emscripten_wrappers(emsdk_dir, self._paths.bin_dir, self._platform.platform)
 
         # Zig compiler wrappers (Windows only)
-        from ms.platform.detection import Platform
-        if self._platform.platform == Platform.WINDOWS:
+        if self._platform.platform.is_windows:
             zig_dir = self._paths.tools_dir / "zig"
             if zig_dir.exists():
                 create_zig_wrappers(zig_dir, self._paths.bin_dir, self._platform.platform)
@@ -226,19 +249,16 @@ class ToolchainService:
         for cmd in cmds:
             if not cmd:
                 continue
-            proc = subprocess.run(
-                cmd,
-                cwd=str(self._paths.tools_dir),
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-            if proc.returncode != 0:
-                self._console.print(f"install failed: {' '.join(cmd)}", Style.ERROR)
-                stderr = (proc.stderr or "").strip()
-                if stderr:
-                    self._console.print(stderr, Style.DIM)
-                return False
+            result = run_process(cmd, cwd=self._paths.tools_dir)
+            match result:
+                case Err(e):
+                    self._console.print(f"install failed: {' '.join(cmd)}", Style.ERROR)
+                    stderr = e.stderr.strip()
+                    if stderr:
+                        self._console.print(stderr, Style.DIM)
+                    return False
+                case Ok(_):
+                    pass
 
         return True
 
@@ -246,7 +266,7 @@ class ToolchainService:
         venv_dir = self._paths.tools_dir / "platformio" / "venv"
         pio = self._platformio_bin(venv_dir)
 
-        env = self._platformio_env_vars()
+        env = self._workspace.platformio_env_vars()
 
         # Wrapper always points at venv pio and enforces PLATFORMIO_* dirs.
         if not dry_run:
@@ -272,32 +292,31 @@ class ToolchainService:
 
         venv_dir.parent.mkdir(parents=True, exist_ok=True)
         if not venv_dir.exists():
-            proc = subprocess.run(
+            result = run_process(
                 [sys.executable, "-m", "venv", str(venv_dir)],
-                text=True,
-                capture_output=True,
-                check=False,
+                cwd=venv_dir.parent,
             )
-            if proc.returncode != 0:
+            if isinstance(result, Err):
                 self._console.print("platformio: venv creation failed", Style.ERROR)
                 return False
 
         py = self._platformio_python(venv_dir)
 
         # Ensure pip
-        subprocess.run([str(py), "-m", "pip", "install", "-U", "pip"], check=False)
-        proc = subprocess.run(
+        run_silent([str(py), "-m", "pip", "install", "-U", "pip"], cwd=venv_dir)
+        result = run_process(
             [str(py), "-m", "pip", "install", f"platformio=={version}"],
-            text=True,
-            capture_output=True,
-            check=False,
+            cwd=venv_dir,
         )
-        if proc.returncode != 0:
-            self._console.print("platformio: pip install failed", Style.ERROR)
-            stderr = (proc.stderr or "").strip()
-            if stderr:
-                self._console.print(stderr, Style.DIM)
-            return False
+        match result:
+            case Err(e):
+                self._console.print("platformio: pip install failed", Style.ERROR)
+                stderr = e.stderr.strip()
+                if stderr:
+                    self._console.print(stderr, Style.DIM)
+                return False
+            case Ok(_):
+                pass
 
         set_installed_version(self._paths.tools_dir, "platformio", version)
         return True
@@ -308,11 +327,14 @@ class ToolchainService:
         http: RealHttpClient,
         downloader: Downloader,
         installer: Installer,
+        pins: ToolPins,
     ) -> bool:
         from ms.tools.api import adoptium_jdk_url
-        from ms.tools.definitions.jdk import JdkTool
+        from ms.tools.definitions.jdk import DEFAULT_JDK_MAJOR, JdkTool
 
         tool = JdkTool()
+        # Use configured major version from pins, or default
+        tool.major_version = pins.jdk_major if pins.jdk_major is not None else DEFAULT_JDK_MAJOR
         os_map = {
             "windows": "windows",
             "linux": "linux",
@@ -354,18 +376,11 @@ class ToolchainService:
         return True
 
     def _platformio_python(self, venv_dir: Path) -> Path:
-        if self._platform.platform == self._platform.platform.WINDOWS:
+        if self._platform.platform.is_windows:
             return venv_dir / "Scripts" / "python.exe"
         return venv_dir / "bin" / "python"
 
     def _platformio_bin(self, venv_dir: Path) -> Path:
-        if self._platform.platform == self._platform.platform.WINDOWS:
+        if self._platform.platform.is_windows:
             return venv_dir / "Scripts" / "pio.exe"
         return venv_dir / "bin" / "pio"
-
-    def _platformio_env_vars(self) -> dict[str, str]:
-        return {
-            "PLATFORMIO_CORE_DIR": str(self._workspace.state_dir / "platformio"),
-            "PLATFORMIO_CACHE_DIR": str(self._workspace.state_dir / "platformio-cache"),
-            "PLATFORMIO_BUILD_CACHE_DIR": str(self._workspace.state_dir / "platformio-build-cache"),
-        }

@@ -12,10 +12,22 @@ class ToolPins:
     Values are tool-id -> version string.
     Special values:
     - "latest": resolve via tool.latest_version()
+    - For JDK: can be "latest" (uses default major) or a major version like "25"
     """
 
     versions: dict[str, str]
     platformio_version: str
+
+    @property
+    def jdk_major(self) -> int | None:
+        """Return JDK major version, or None for latest LTS default."""
+        jdk = self.versions.get("jdk", "latest")
+        if jdk == "latest":
+            return None
+        try:
+            return int(jdk)
+        except ValueError:
+            return None
 
     @classmethod
     def load(cls, path: Path) -> ToolPins:

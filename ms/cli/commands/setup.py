@@ -4,6 +4,7 @@ import typer
 
 from ms.cli.context import build_context
 from ms.core.errors import ErrorCode
+from ms.core.result import Err, Ok
 from ms.services.setup import SetupService
 
 
@@ -24,7 +25,7 @@ def setup(
         console=ctx.console,
     )
 
-    ok = service.setup_dev(
+    result = service.setup_dev(
         mode=mode,
         skip_repos=skip_repos,
         skip_tools=skip_tools,
@@ -32,5 +33,11 @@ def setup(
         skip_check=skip_check,
         dry_run=dry_run,
     )
-    if not ok:
-        raise typer.Exit(code=int(ErrorCode.ENV_ERROR))
+    match result:
+        case Ok(_):
+            pass
+        case Err(e):
+            ctx.console.error(f"setup failed: {e.message}")
+            if e.hint:
+                ctx.console.print(e.hint)
+            raise typer.Exit(code=int(ErrorCode.ENV_ERROR))

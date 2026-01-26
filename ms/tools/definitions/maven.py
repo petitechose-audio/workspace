@@ -65,7 +65,7 @@ class MavenTool(Tool):
 
         Note: On Windows, both mvn and mvn.cmd exist; we use mvn.cmd.
         """
-        if platform == platform.WINDOWS:
+        if platform.is_windows:
             return tools_dir / "maven" / "bin" / "mvn.cmd"
         return tools_dir / "maven" / "bin" / "mvn"
 

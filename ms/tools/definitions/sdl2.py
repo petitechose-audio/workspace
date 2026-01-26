@@ -69,7 +69,7 @@ class Sdl2Tool(GitHubTool):
 
     def bin_path(self, tools_dir: Path, platform: Platform) -> Path | None:
         """SDL2 DLL path."""
-        if str(platform).lower() == "windows":
+        if platform.is_windows:
             return tools_dir / "sdl2" / "bin" / "SDL2.dll"
         return None
 
@@ -84,14 +84,11 @@ class Sdl2Tool(GitHubTool):
 
     def is_installed(self, tools_dir: Path, platform: Platform) -> bool:
         """Check if SDL2 is installed."""
-        platform_str = str(platform).lower()
-
-        if platform_str == "windows":
+        if platform.is_windows:
             # MinGW package: lib/libSDL2.a or lib/libSDL2.dll.a
             lib_path = tools_dir / "sdl2" / "lib" / "libSDL2.dll.a"
             return lib_path.exists()
-        else:
-            return shutil.which("sdl2-config") is not None
+        return shutil.which("sdl2-config") is not None
 
     def is_windows_only(self) -> bool:
         """SDL2 auto-install is Windows-only."""
@@ -99,7 +96,11 @@ class Sdl2Tool(GitHubTool):
 
     def get_install_hint(self, platform: Platform) -> str | None:
         """Get installation hint for non-Windows platforms."""
-        return self.install_hints.get(str(platform).lower())
+        if platform.is_linux:
+            return self.install_hints.get("linux")
+        if platform.is_macos:
+            return self.install_hints.get("macos")
+        return None
 
     def post_install(self, install_dir: Path, platform: Platform) -> None:
         """Move x86_64-w64-mingw32/ contents to root.
@@ -111,7 +112,7 @@ class Sdl2Tool(GitHubTool):
         We want:
           sdl2/{bin,include,lib,share}/
         """
-        if str(platform).lower() != "windows":
+        if not platform.is_windows:
             return
 
         mingw64_dir = install_dir / "x86_64-w64-mingw32"

@@ -26,15 +26,12 @@ Usage:
 from __future__ import annotations
 
 import re
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from ms.core.result import Err, Ok, Result
-
-if TYPE_CHECKING:
-    pass
+from ms.platform.process import ProcessError
+from ms.platform.process import run as run_process
 
 __all__ = [
     "GitError",
@@ -185,16 +182,17 @@ class Repository:
             Err(GitError) on failure
         """
         result = self._run(["status", "--porcelain=v1", "-b"])
-        if result.returncode != 0:
-            return Err(
-                GitError(
-                    command="status",
-                    message=result.stderr.strip() or "git status failed",
-                    returncode=result.returncode,
+        match result:
+            case Err(e):
+                return Err(
+                    GitError(
+                        command="status",
+                        message=e.stderr.strip() or "git status failed",
+                        returncode=e.returncode,
+                    )
                 )
-            )
-
-        return Ok(self._parse_status(result.stdout))
+            case Ok(stdout):
+                return Ok(self._parse_status(stdout))
 
     def is_clean(self) -> bool:
         """Check if working tree is clean (no changes).
@@ -202,7 +200,11 @@ class Repository:
         Returns False if status cannot be determined.
         """
         result = self._run(["status", "--porcelain"])
-        return result.returncode == 0 and result.stdout.strip() == ""
+        match result:
+            case Ok(stdout):
+                return stdout.strip() == ""
+            case Err(_):
+                return False
 
     def has_upstream(self) -> bool:
         """Check if current branch has an upstream configured."""
@@ -214,7 +216,7 @@ class Repository:
                 "@{u}",
             ]
         )
-        return result.returncode == 0
+        return isinstance(result, Ok)
 
     def current_branch(self) -> str | None:
         """Get current branch name.
@@ -222,10 +224,12 @@ class Repository:
         Returns None if detached HEAD or error.
         """
         result = self._run(["rev-parse", "--abbrev-ref", "HEAD"])
-        if result.returncode != 0:
-            return None
-        branch = result.stdout.strip()
-        return None if branch == "HEAD" else branch
+        match result:
+            case Ok(stdout):
+                branch = stdout.strip()
+                return None if branch == "HEAD" else branch
+            case Err(_):
+                return None
 
     def pull_ff(self) -> Result[str, GitError]:
         """Pull with fast-forward only.
@@ -235,15 +239,17 @@ class Repository:
             Err(GitError) on failure (conflicts, no upstream, etc.)
         """
         result = self._run(["pull", "--ff-only"])
-        if result.returncode != 0:
-            return Err(
-                GitError(
-                    command="pull --ff-only",
-                    message=result.stderr.strip() or result.stdout.strip() or "pull failed",
-                    returncode=result.returncode,
+        match result:
+            case Err(e):
+                return Err(
+                    GitError(
+                        command="pull --ff-only",
+                        message=e.stderr.strip() or e.stdout.strip() or "pull failed",
+                        returncode=e.returncode,
+                    )
                 )
-            )
-        return Ok(result.stdout.strip())
+            case Ok(stdout):
+                return Ok(stdout.strip())
 
     def fetch(self) -> Result[str, GitError]:
         """Fetch from remote.
@@ -253,23 +259,21 @@ class Repository:
             Err(GitError) on failure
         """
         result = self._run(["fetch"])
-        if result.returncode != 0:
-            return Err(
-                GitError(
-                    command="fetch",
-                    message=result.stderr.strip() or "fetch failed",
-                    returncode=result.returncode,
+        match result:
+            case Err(e):
+                return Err(
+                    GitError(
+                        command="fetch",
+                        message=e.stderr.strip() or "fetch failed",
+                        returncode=e.returncode,
+                    )
                 )
-            )
-        return Ok(result.stdout.strip())
+            case Ok(stdout):
+                return Ok(stdout.strip())
 
-    def _run(self, args: list[str]) -> subprocess.CompletedProcess[str]:
+    def _run(self, args: list[str]) -> Result[str, ProcessError]:
         """Run a git command in this repository."""
-        return subprocess.run(
-            ["git", "-C", str(self.path), *args],
-            capture_output=True,
-            text=True,
-        )
+        return run_process(["git", "-C", str(self.path), *args], cwd=self.path)
 
     def _parse_status(self, output: str) -> GitStatus:
         """Parse git status --porcelain=v1 -b output."""

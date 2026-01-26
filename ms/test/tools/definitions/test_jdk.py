@@ -9,7 +9,7 @@ import pytest
 from ms.core.result import Err, Ok
 from ms.platform.detection import Arch, Platform
 from ms.tools.base import Mode
-from ms.tools.definitions.jdk import JdkTool
+from ms.tools.definitions.jdk import DEFAULT_JDK_MAJOR, JdkTool
 from ms.tools.http import HttpError, MockHttpClient
 
 
@@ -54,10 +54,10 @@ class TestJdkTool:
         assert tool.strip_components() == 1
 
     def test_major_version_default(self) -> None:
-        """Default JDK major version is 21."""
+        """Default JDK major version matches constant."""
         tool = JdkTool()
 
-        assert tool.major_version == 21
+        assert tool.major_version == DEFAULT_JDK_MAJOR
 
 
 class TestJdkToolLatestVersion:
@@ -67,7 +67,7 @@ class TestJdkToolLatestVersion:
         """Fetch latest version from Adoptium."""
         client = MockHttpClient()
         client.set_text(
-            "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
+            f"https://api.adoptium.net/v3/assets/latest/{DEFAULT_JDK_MAJOR}/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
             json.dumps(ADOPTIUM_RESPONSE),
         )
 
@@ -75,7 +75,7 @@ class TestJdkToolLatestVersion:
         result = tool.latest_version(client)
 
         assert isinstance(result, Ok)
-        assert result.value == "21.0.2+13"
+        assert result.value == "21.0.2+13"  # Version from mock response
 
     def test_returns_release_name_if_no_semver(self) -> None:
         """Use release_name if semver is not available."""
@@ -91,7 +91,7 @@ class TestJdkToolLatestVersion:
         ]
         client = MockHttpClient()
         client.set_text(
-            "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
+            f"https://api.adoptium.net/v3/assets/latest/{DEFAULT_JDK_MAJOR}/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
             json.dumps(response),
         )
 
@@ -105,7 +105,7 @@ class TestJdkToolLatestVersion:
         """Error when Adoptium returns empty array."""
         client = MockHttpClient()
         client.set_text(
-            "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
+            f"https://api.adoptium.net/v3/assets/latest/{DEFAULT_JDK_MAJOR}/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
             "[]",
         )
 
@@ -119,7 +119,7 @@ class TestJdkToolLatestVersion:
         """Error on network failure."""
         client = MockHttpClient()
         client.set_text(
-            "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
+            f"https://api.adoptium.net/v3/assets/latest/{DEFAULT_JDK_MAJOR}/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
             HttpError(url="...", status=500, message="Server error"),
         )
 

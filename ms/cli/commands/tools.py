@@ -4,6 +4,7 @@ import typer
 
 from ms.cli.context import build_context
 from ms.core.errors import ErrorCode
+from ms.core.result import Err, Ok
 from ms.services.toolchains import ToolchainService
 
 
@@ -27,6 +28,10 @@ def sync(
         config=ctx.config,
         console=ctx.console,
     )
-    ok = service.sync_dev(dry_run=dry_run, force=force)
-    if not ok:
-        raise typer.Exit(code=int(ErrorCode.ENV_ERROR))
+    result = service.sync_dev(dry_run=dry_run, force=force)
+    match result:
+        case Ok(_):
+            pass
+        case Err(e):
+            ctx.console.error(f"toolchain sync failed: {e.message}")
+            raise typer.Exit(code=int(ErrorCode.ENV_ERROR))

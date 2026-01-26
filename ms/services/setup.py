@@ -1,15 +1,32 @@
 from __future__ import annotations
 
-import subprocess
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 from ms.core.config import Config
+from ms.core.result import Err, Ok, Result
 from ms.core.workspace import Workspace
 from ms.output.console import ConsoleProtocol, Style
 from ms.platform.detection import PlatformInfo
+from ms.platform.process import run_silent
 from ms.services.check import CheckService
 from ms.services.repos import RepoService
 from ms.services.toolchains import ToolchainService
+
+
+# -----------------------------------------------------------------------------
+# Error Types
+# -----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class SetupError:
+    """Error from setup operations."""
+
+    kind: Literal["mode_unsupported", "repos_failed", "tools_failed", "python_failed", "check_failed"]
+    message: str
+    hint: str | None = None
 
 
 class SetupService:
@@ -35,10 +52,15 @@ class SetupService:
         skip_python: bool,
         skip_check: bool,
         dry_run: bool,
-    ) -> bool:
+    ) -> Result[None, SetupError]:
         if mode.lower() != "dev":
-            self._console.print("Only --mode dev is supported for now", Style.ERROR)
-            return False
+            return Err(
+                SetupError(
+                    kind="mode_unsupported",
+                    message=f"mode '{mode}' is not supported",
+                    hint="use --mode dev",
+                )
+            )
 
         # Ensure state dirs exist
         if not dry_run:
@@ -48,33 +70,45 @@ class SetupService:
             self._workspace.bin_dir.mkdir(parents=True, exist_ok=True)
             self._write_state(mode="dev")
 
-        ok = True
-
         if not skip_repos:
             self._console.header("Repos")
-            ok = (
-                RepoService(workspace=self._workspace, console=self._console).sync_all(
-                    limit=200,
-                    dry_run=dry_run,
-                )
-                and ok
+            result = RepoService(workspace=self._workspace, console=self._console).sync_all(
+                limit=200,
+                dry_run=dry_run,
             )
+            if isinstance(result, Err):
+                return Err(
+                    SetupError(
+                        kind="repos_failed",
+                        message=result.error.message,
+                    )
+                )
 
         if not skip_tools:
             self._console.header("Tools")
-            ok = (
-                ToolchainService(
-                    workspace=self._workspace,
-                    platform=self._platform,
-                    config=self._config,
-                    console=self._console,
-                ).sync_dev(dry_run=dry_run)
-                and ok
-            )
+            result = ToolchainService(
+                workspace=self._workspace,
+                platform=self._platform,
+                config=self._config,
+                console=self._console,
+            ).sync_dev(dry_run=dry_run)
+            if isinstance(result, Err):
+                return Err(
+                    SetupError(
+                        kind="tools_failed",
+                        message=result.error.message,
+                    )
+                )
 
         if not skip_python:
             self._console.header("Python deps")
-            ok = self._sync_python_deps(dry_run=dry_run) and ok
+            if not self._sync_python_deps(dry_run=dry_run):
+                return Err(
+                    SetupError(
+                        kind="python_failed",
+                        message="uv sync failed",
+                    )
+                )
 
         if not skip_check:
             self._console.header("Check")
@@ -83,9 +117,15 @@ class SetupService:
                 platform=self._platform,
                 config=self._config,
             ).run()
-            ok = (not report.has_errors()) and ok
+            if report.has_errors():
+                return Err(
+                    SetupError(
+                        kind="check_failed",
+                        message="workspace check found errors",
+                    )
+                )
 
-        return ok
+        return Ok(None)
 
     def _write_state(self, *, mode: str) -> None:
         # Minimal, forward-compatible state.
@@ -104,5 +144,5 @@ class SetupService:
         self._console.print(" ".join(cmd), Style.DIM)
         if dry_run:
             return True
-        proc = subprocess.run(cmd, cwd=str(self._workspace.root), check=False)
-        return proc.returncode == 0
+        result = run_silent(cmd, cwd=self._workspace.root)
+        return not isinstance(result, Err)

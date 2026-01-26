@@ -1,13 +1,32 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
+from ms.core.result import Err, Ok, Result
 from ms.core.workspace import Workspace
 from ms.output.console import ConsoleProtocol, Style
+from ms.platform.process import run as run_process
+
+# -----------------------------------------------------------------------------
+# Error Types
+# -----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class RepoError:
+    """Error from repository sync operations."""
+
+    kind: Literal["gh_missing", "not_authenticated", "sync_failed"]
+    message: str
+    hint: str | None = None
+
+
+# -----------------------------------------------------------------------------
+# Data Types
+# -----------------------------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,17 +66,20 @@ class RepoService:
         self._workspace = workspace
         self._console = console
 
-    def sync_all(self, *, limit: int = 200, dry_run: bool = False) -> bool:
-        if not self._check_gh_auth():
-            return False
+    def sync_all(
+        self, *, limit: int = 200, dry_run: bool = False
+    ) -> Result[None, RepoError]:
+        auth_result = self._check_gh_auth()
+        if isinstance(auth_result, Err):
+            return auth_result
 
         lock: list[RepoLockEntry] = []
-        ok = True
+        has_errors = False
 
         for org in self.ORGS:
             repos = self._list_org_repos(org, limit=limit)
             if repos is None:
-                ok = False
+                has_errors = True
                 continue
 
             for repo in repos:
@@ -67,28 +89,43 @@ class RepoService:
                 dest = self._dest_dir_for_repo(org, repo.name)
                 entry = self._sync_repo(repo, dest, dry_run=dry_run)
                 if entry is None:
-                    ok = False
+                    has_errors = True
                     continue
                 lock.append(entry)
 
         if not dry_run:
             self._write_lock(lock)
 
-        return ok
+        if has_errors:
+            return Err(
+                RepoError(
+                    kind="sync_failed",
+                    message="some repositories failed to sync",
+                )
+            )
+        return Ok(None)
 
-    def _check_gh_auth(self) -> bool:
+    def _check_gh_auth(self) -> Result[None, RepoError]:
         if not self._which("gh"):
-            self._console.print("gh: missing", Style.ERROR)
-            self._console.print("hint: install GitHub CLI (gh)", Style.DIM)
-            return False
+            return Err(
+                RepoError(
+                    kind="gh_missing",
+                    message="gh: missing",
+                    hint="install GitHub CLI (gh)",
+                )
+            )
 
-        proc = self._run(["gh", "auth", "status"], check=False)
-        if proc.returncode != 0:
-            self._console.print("gh auth: not logged in", Style.ERROR)
-            self._console.print("hint: run `gh auth login`", Style.DIM)
-            return False
+        result = run_process(["gh", "auth", "status"], cwd=self._workspace.root)
+        if isinstance(result, Err):
+            return Err(
+                RepoError(
+                    kind="not_authenticated",
+                    message="gh auth: not logged in",
+                    hint="run `gh auth login`",
+                )
+            )
 
-        return True
+        return Ok(None)
 
     def _list_org_repos(self, org: str, *, limit: int) -> list[RepoRef] | None:
         cmd = [
@@ -102,16 +139,19 @@ class RepoService:
             "name,isArchived,defaultBranchRef,url",
         ]
 
-        proc = self._run(cmd, check=False)
-        if proc.returncode != 0:
-            self._console.print(f"gh repo list failed for {org}", Style.ERROR)
-            stderr = (proc.stderr or "").strip()
-            if stderr:
-                self._console.print(stderr, Style.DIM)
-            return None
+        result = run_process(cmd, cwd=self._workspace.root)
+        match result:
+            case Err(e):
+                self._console.print(f"gh repo list failed for {org}", Style.ERROR)
+                stderr = e.stderr.strip()
+                if stderr:
+                    self._console.print(stderr, Style.DIM)
+                return None
+            case Ok(stdout):
+                pass
 
         try:
-            raw: Any = json.loads(proc.stdout)
+            raw: Any = json.loads(stdout)
         except json.JSONDecodeError:
             self._console.print(f"gh repo list returned invalid JSON for {org}", Style.ERROR)
             return None
@@ -161,8 +201,8 @@ class RepoService:
             self._console.print(f"clone {repo.org}/{repo.name} -> {dest}", Style.DIM)
             if not dry_run:
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                proc = self._run(["git", "clone", repo.url, str(dest)], check=False)
-                if proc.returncode != 0:
+                result = run_process(["git", "clone", repo.url, str(dest)], cwd=self._workspace.root)
+                if isinstance(result, Err):
                     self._console.print(f"git clone failed: {repo.org}/{repo.name}", Style.ERROR)
                     return None
 
@@ -203,9 +243,15 @@ class RepoService:
 
         self._console.print(f"update {repo.org}/{repo.name}", Style.DIM)
         if not dry_run:
-            self._run(["git", "-C", str(dest), "fetch", "--prune"], check=False)
-            proc = self._run(["git", "-C", str(dest), "pull", "--ff-only"], check=False)
-            if proc.returncode != 0:
+            fetch_result = run_process(
+                ["git", "-C", str(dest), "fetch", "--prune"], cwd=self._workspace.root
+            )
+            if isinstance(fetch_result, Err):
+                self._console.print(f"git fetch failed: {dest}", Style.WARNING)
+            result = run_process(
+                ["git", "-C", str(dest), "pull", "--ff-only"], cwd=self._workspace.root
+            )
+            if isinstance(result, Err):
                 self._console.print(f"git pull --ff-only failed: {dest}", Style.WARNING)
 
         return RepoLockEntry(
@@ -236,44 +282,37 @@ class RepoService:
 
         return shutil.which(name)
 
-    def _run(self, args: list[str], *, check: bool) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            args,
-            cwd=str(self._workspace.root),
-            text=True,
-            capture_output=True,
-            check=check,
-        )
-
     def _is_dirty(self, repo_dir: Path) -> bool:
-        proc = subprocess.run(
+        result = run_process(
             ["git", "-C", str(repo_dir), "status", "--porcelain"],
-            text=True,
-            capture_output=True,
-            check=False,
+            cwd=repo_dir,
         )
-        return bool((proc.stdout or "").strip())
+        match result:
+            case Ok(stdout):
+                return bool(stdout.strip())
+            case Err(_):
+                return False
 
     def _current_branch(self, repo_dir: Path) -> str | None:
-        proc = subprocess.run(
+        result = run_process(
             ["git", "-C", str(repo_dir), "rev-parse", "--abbrev-ref", "HEAD"],
-            text=True,
-            capture_output=True,
-            check=False,
+            cwd=repo_dir,
         )
-        if proc.returncode != 0:
-            return None
-        value = (proc.stdout or "").strip()
-        return value or None
+        match result:
+            case Ok(stdout):
+                value = stdout.strip()
+                return value or None
+            case Err(_):
+                return None
 
     def _head_sha(self, repo_dir: Path) -> str | None:
-        proc = subprocess.run(
+        result = run_process(
             ["git", "-C", str(repo_dir), "rev-parse", "HEAD"],
-            text=True,
-            capture_output=True,
-            check=False,
+            cwd=repo_dir,
         )
-        if proc.returncode != 0:
-            return None
-        value = (proc.stdout or "").strip()
-        return value or None
+        match result:
+            case Ok(stdout):
+                value = stdout.strip()
+                return value or None
+            case Err(_):
+                return None

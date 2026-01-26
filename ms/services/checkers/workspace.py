@@ -189,8 +189,6 @@ class WorkspaceChecker:
 
     def _exe_name(self, name: str) -> str:
         """Get executable name for current platform."""
-        from ms.platform.detection import Platform
-
-        if self.platform == Platform.WINDOWS:
+        if self.platform.is_windows:
             return f"{name}.exe"
         return name

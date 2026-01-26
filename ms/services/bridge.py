@@ -1,14 +1,30 @@
 from __future__ import annotations
 
 import shutil
-import subprocess
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
-from ms.core.errors import ErrorCode
 from ms.core.config import Config
+from ms.core.errors import ErrorCode
+from ms.core.result import Err, Ok, Result
 from ms.core.workspace import Workspace
 from ms.output.console import ConsoleProtocol, Style
 from ms.platform.detection import PlatformInfo
+from ms.platform.process import run_silent
+
+# -----------------------------------------------------------------------------
+# Error Types
+# -----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class BridgeError:
+    """Error from bridge operations."""
+
+    kind: Literal["dir_missing", "cargo_missing", "build_failed", "binary_missing"]
+    message: str
+    hint: str | None = None
 
 
 class BridgeService:
@@ -25,17 +41,27 @@ class BridgeService:
         self._config = config
         self._console = console
 
-    def build(self, *, release: bool = True, dry_run: bool = False) -> bool:
+    def build(
+        self, *, release: bool = True, dry_run: bool = False
+    ) -> Result[Path, BridgeError]:
         bridge_dir = self._bridge_dir()
         if not bridge_dir.is_dir():
-            self._console.error(f"bridge dir missing: {bridge_dir}")
-            self._console.print("hint: Run: uv run ms repos sync", Style.DIM)
-            return False
+            return Err(
+                BridgeError(
+                    kind="dir_missing",
+                    message=f"bridge dir missing: {bridge_dir}",
+                    hint="Run: uv run ms repos sync",
+                )
+            )
 
         if shutil.which("cargo") is None:
-            self._console.error("cargo: missing")
-            self._console.print("hint: install rustup: https://rustup.rs", Style.DIM)
-            return False
+            return Err(
+                BridgeError(
+                    kind="cargo_missing",
+                    message="cargo: missing",
+                    hint="install rustup: https://rustup.rs",
+                )
+            )
 
         cmd = ["cargo", "build"]
         if release:
@@ -45,33 +71,36 @@ class BridgeService:
         dst = self._installed_bridge_bin()
         if dry_run:
             self._console.print(f"would install bridge -> {dst}", Style.DIM)
-            return True
+            return Ok(dst)
 
-        proc = subprocess.run(cmd, cwd=str(bridge_dir), check=False)
-        if proc.returncode != 0:
-            self._console.error("bridge build failed")
-            return False
+        result = run_silent(cmd, cwd=bridge_dir)
+        if isinstance(result, Err):
+            return Err(
+                BridgeError(kind="build_failed", message="bridge build failed")
+            )
 
         built = self._built_bridge_bin(bridge_dir, release=release)
         if not built.exists():
-            self._console.error(f"bridge binary missing: {built}")
-            return False
+            return Err(
+                BridgeError(
+                    kind="binary_missing",
+                    message=f"bridge binary missing: {built}",
+                )
+            )
 
         self._console.print(f"install bridge -> {dst}", Style.DIM)
 
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(built, dst)
-        try:
+        if self._platform.platform.is_unix:
             dst.chmod(0o755)
-        except Exception:
-            pass
 
         src_config = bridge_dir / "config"
         if src_config.is_dir():
             shutil.copytree(src_config, dst.parent / "config", dirs_exist_ok=True)
 
         self._console.success(str(dst))
-        return True
+        return Ok(dst)
 
     def run(self, *, args: list[str]) -> int:
         exe = self._installed_bridge_bin()
@@ -87,7 +116,12 @@ class BridgeService:
 
         cmd = [str(exe), *args]
         self._console.print(" ".join(cmd), Style.DIM)
-        return subprocess.run(cmd, cwd=str(self._workspace.root), check=False).returncode
+        result = run_silent(cmd, cwd=self._workspace.root)
+        match result:
+            case Ok(_):
+                return 0
+            case Err(e):
+                return e.returncode
 
     def _bridge_dir(self) -> Path:
         rel = self._config.paths.bridge if self._config is not None else "open-control/bridge"

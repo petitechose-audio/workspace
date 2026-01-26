@@ -2,50 +2,60 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
-from ms.core.config import Config
-from ms.core.workspace import Workspace
-from ms.output.console import ConsoleProtocol, Style
-from ms.platform.detection import Platform, PlatformInfo
+from ms.core.result import Err, Ok, Result
+from ms.output.console import Style
+from ms.platform.detection import Platform
 from ms.platform.paths import home
-from ms.tools.registry import ToolRegistry
+from ms.platform.process import run_silent
+from ms.services.base import BaseService
+
+# -----------------------------------------------------------------------------
+# Error Types
+# -----------------------------------------------------------------------------
 
 
-class BitwigService:
-    def __init__(
-        self,
-        *,
-        workspace: Workspace,
-        platform: PlatformInfo,
-        config: Config | None,
-        console: ConsoleProtocol,
-    ) -> None:
-        self._workspace = workspace
-        self._platform = platform
-        self._config = config
-        self._console = console
+@dataclass(frozen=True, slots=True)
+class BitwigError:
+    """Error from Bitwig extension operations."""
 
-        tools_dir = workspace.root / (config.paths.tools if config else "tools")
-        self._registry = ToolRegistry(
-            tools_dir=tools_dir,
-            platform=platform.platform,
-            arch=platform.arch,
-        )
+    kind: Literal[
+        "host_missing",
+        "maven_missing",
+        "build_failed",
+        "extension_not_found",
+        "dir_not_configured",
+    ]
+    message: str
+    hint: str | None = None
 
-    def build(self, *, dry_run: bool = False) -> bool:
+
+class BitwigService(BaseService):
+    """Service for building and deploying Bitwig extensions."""
+
+    def build(self, *, dry_run: bool = False) -> Result[Path, BitwigError]:
         host_dir = self._host_dir()
         if not (host_dir / "pom.xml").exists():
-            self._console.error(f"bitwig host missing: {host_dir}")
-            self._console.print("hint: Run: uv run ms repos sync", Style.DIM)
-            return False
+            return Err(
+                BitwigError(
+                    kind="host_missing",
+                    message=f"bitwig host missing: {host_dir}",
+                    hint="Run: uv run ms repos sync",
+                )
+            )
 
         mvn = self._mvn_path()
         if mvn is None:
-            self._console.error("maven: missing")
-            self._console.print("hint: Run: uv run ms tools sync", Style.DIM)
-            return False
+            return Err(
+                BitwigError(
+                    kind="maven_missing",
+                    message="maven: missing",
+                    hint="Run: uv run ms tools sync",
+                )
+            )
 
         env = self._build_env()
         cmd = [
@@ -56,39 +66,59 @@ class BitwigService:
         ]
         self._console.print(" ".join(cmd), Style.DIM)
         if dry_run:
-            return True
+            built = host_dir / "target" / "midi_studio.bwextension"
+            return Ok(built)
 
-        proc = subprocess.run(cmd, cwd=str(host_dir), env=env, check=False)
-        if proc.returncode != 0:
-            self._console.error("maven build failed")
-            return False
+        result = run_silent(cmd, cwd=host_dir, env=env)
+        if isinstance(result, Err):
+            return Err(
+                BitwigError(kind="build_failed", message="maven build failed")
+            )
 
         built = host_dir / "target" / "midi_studio.bwextension"
         if not built.exists():
-            self._console.error(f"extension not found: {built}")
-            return False
+            return Err(
+                BitwigError(
+                    kind="extension_not_found",
+                    message=f"extension not found: {built}",
+                )
+            )
 
         self._copy_to_bin(built)
         self._console.success(str(built))
-        return True
+        return Ok(built)
 
-    def deploy(self, *, extensions_dir: Path | None = None, dry_run: bool = False) -> bool:
+    def deploy(
+        self, *, extensions_dir: Path | None = None, dry_run: bool = False
+    ) -> Result[Path, BitwigError]:
         host_dir = self._host_dir()
         if not (host_dir / "pom.xml").exists():
-            self._console.error(f"bitwig host missing: {host_dir}")
-            self._console.print("hint: Run: uv run ms repos sync", Style.DIM)
-            return False
+            return Err(
+                BitwigError(
+                    kind="host_missing",
+                    message=f"bitwig host missing: {host_dir}",
+                    hint="Run: uv run ms repos sync",
+                )
+            )
 
         mvn = self._mvn_path()
         if mvn is None:
-            self._console.error("maven: missing")
-            self._console.print("hint: Run: uv run ms tools sync", Style.DIM)
-            return False
+            return Err(
+                BitwigError(
+                    kind="maven_missing",
+                    message="maven: missing",
+                    hint="Run: uv run ms tools sync",
+                )
+            )
 
         install_dir = extensions_dir or self._resolve_extensions_dir()
         if install_dir is None:
-            self._console.error("bitwig extensions dir not configured")
-            return False
+            return Err(
+                BitwigError(
+                    kind="dir_not_configured",
+                    message="bitwig extensions dir not configured",
+                )
+            )
 
         self._console.print(f"extensions dir: {install_dir}", Style.DIM)
         if not dry_run:
@@ -103,26 +133,34 @@ class BitwigService:
         ]
         self._console.print(" ".join(cmd), Style.DIM)
         if dry_run:
-            return True
+            deployed = install_dir / "midi_studio.bwextension"
+            return Ok(deployed)
 
-        proc = subprocess.run(cmd, cwd=str(host_dir), env=env, check=False)
-        if proc.returncode != 0:
-            self._console.error("maven build failed")
-            return False
+        result = run_silent(cmd, cwd=host_dir, env=env)
+        if isinstance(result, Err):
+            return Err(
+                BitwigError(kind="build_failed", message="maven build failed")
+            )
 
         deployed = install_dir / "midi_studio.bwextension"
         if not deployed.exists():
             # Fallback: find any .bwextension file.
             matches = list(install_dir.glob("*.bwextension"))
-            deployed = max(matches, key=lambda p: p.stat().st_mtime) if matches else deployed
+            deployed = (
+                max(matches, key=lambda p: p.stat().st_mtime) if matches else deployed
+            )
 
         if not deployed.exists():
-            self._console.error(f"extension not found: {deployed}")
-            return False
+            return Err(
+                BitwigError(
+                    kind="extension_not_found",
+                    message=f"extension not found: {deployed}",
+                )
+            )
 
         self._copy_to_bin(deployed)
         self._console.success(str(deployed))
-        return True
+        return Ok(deployed)
 
     def _host_dir(self) -> Path:
         rel = (
@@ -167,6 +205,8 @@ class BitwigService:
 
     def _build_env(self) -> dict[str, str]:
         env = os.environ.copy()
+        # Don't inherit MAVEN_OPTS - build uses bundled JDK with known options
+        env.pop("MAVEN_OPTS", None)
         env.update(self._registry.get_env_vars())
         return env
 
@@ -175,8 +215,8 @@ class BitwigService:
         dst_dir.mkdir(parents=True, exist_ok=True)
         try:
             shutil.copy2(src, dst_dir / src.name)
-        except Exception:
-            pass
+        except OSError as e:
+            self._console.print(f"failed to copy {src.name} to bin: {e}", Style.WARNING)
 
 
 def _expand_user_vars(value: str) -> Path:

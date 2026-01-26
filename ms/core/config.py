@@ -21,7 +21,30 @@ __all__ = [
     "PathsConfig",
     "ConfigError",
     "load_config",
+    # Port constants
+    "CONTROLLER_CORE_NATIVE_PORT",
+    "CONTROLLER_CORE_WASM_PORT",
+    "CONTROLLER_BITWIG_NATIVE_PORT",
+    "CONTROLLER_BITWIG_WASM_PORT",
+    "BRIDGE_HARDWARE_PORT",
+    "BRIDGE_NATIVE_PORT",
+    "BRIDGE_WASM_PORT",
 ]
+
+# -----------------------------------------------------------------------------
+# Default Port Constants
+# -----------------------------------------------------------------------------
+
+# Controller ports (app → bridge communication)
+CONTROLLER_CORE_NATIVE_PORT = 8000
+CONTROLLER_CORE_WASM_PORT = 8100
+CONTROLLER_BITWIG_NATIVE_PORT = 8001
+CONTROLLER_BITWIG_WASM_PORT = 8101
+
+# Bridge ports (bridge internal)
+BRIDGE_HARDWARE_PORT = 9000
+BRIDGE_NATIVE_PORT = 9001
+BRIDGE_WASM_PORT = 9002
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,19 +59,19 @@ class ConfigError:
 class ControllerPortsConfig:
     """Controller port configuration."""
 
-    core_native: int = 8000
-    core_wasm: int = 8100
-    bitwig_native: int = 8001
-    bitwig_wasm: int = 8101
+    core_native: int = CONTROLLER_CORE_NATIVE_PORT
+    core_wasm: int = CONTROLLER_CORE_WASM_PORT
+    bitwig_native: int = CONTROLLER_BITWIG_NATIVE_PORT
+    bitwig_wasm: int = CONTROLLER_BITWIG_WASM_PORT
 
 
 @dataclass(frozen=True, slots=True)
 class PortsConfig:
     """Port configuration for bridge communication."""
 
-    hardware: int = 9000
-    native: int = 9001
-    wasm: int = 9002
+    hardware: int = BRIDGE_HARDWARE_PORT
+    native: int = BRIDGE_NATIVE_PORT
+    wasm: int = BRIDGE_WASM_PORT
     controller: ControllerPortsConfig = field(default_factory=ControllerPortsConfig)
 
 
@@ -124,14 +147,14 @@ class Config:
 
         return cls(
             ports=PortsConfig(
-                hardware=int(ports_data.get("hardware", 9000)),
-                native=int(ports_data.get("native", 9001)),
-                wasm=int(ports_data.get("wasm", 9002)),
+                hardware=int(ports_data.get("hardware", BRIDGE_HARDWARE_PORT)),
+                native=int(ports_data.get("native", BRIDGE_NATIVE_PORT)),
+                wasm=int(ports_data.get("wasm", BRIDGE_WASM_PORT)),
                 controller=ControllerPortsConfig(
-                    core_native=int(controller_data.get("core_native", 8000)),
-                    core_wasm=int(controller_data.get("core_wasm", 8100)),
-                    bitwig_native=int(controller_data.get("bitwig_native", 8001)),
-                    bitwig_wasm=int(controller_data.get("bitwig_wasm", 8101)),
+                    core_native=int(controller_data.get("core_native", CONTROLLER_CORE_NATIVE_PORT)),
+                    core_wasm=int(controller_data.get("core_wasm", CONTROLLER_CORE_WASM_PORT)),
+                    bitwig_native=int(controller_data.get("bitwig_native", CONTROLLER_BITWIG_NATIVE_PORT)),
+                    bitwig_wasm=int(controller_data.get("bitwig_wasm", CONTROLLER_BITWIG_WASM_PORT)),
                 ),
             ),
             midi=MidiConfig(

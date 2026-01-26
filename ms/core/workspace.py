@@ -115,6 +115,22 @@ class Workspace:
         """Path to midi-studio project."""
         return self.root / "midi-studio"
 
+    @property
+    def platformio_dir(self) -> Path:
+        """Path to PlatformIO core directory."""
+        return self.state_dir / "platformio"
+
+    def platformio_env_vars(self) -> dict[str, str]:
+        """Get PlatformIO environment variables.
+
+        These isolate PlatformIO state to the workspace.
+        """
+        return {
+            "PLATFORMIO_CORE_DIR": str(self.platformio_dir),
+            "PLATFORMIO_CACHE_DIR": str(self.state_dir / "platformio-cache"),
+            "PLATFORMIO_BUILD_CACHE_DIR": str(self.state_dir / "platformio-build-cache"),
+        }
+
     def exists(self) -> bool:
         """Check if this workspace still exists on disk."""
         return self.root.is_dir() and self.marker_path.exists()

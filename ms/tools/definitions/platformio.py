@@ -59,8 +59,8 @@ class PlatformioTool(Tool):
         return "platformio"
 
     def bin_path(self, tools_dir: Path, platform: Platform) -> Path | None:
-        bin_dir = "Scripts" if str(platform).lower() == "windows" else "bin"
-        exe = "pio.exe" if str(platform).lower() == "windows" else "pio"
+        bin_dir = "Scripts" if platform.is_windows else "bin"
+        exe = "pio.exe" if platform.is_windows else "pio"
         return tools_dir / "platformio" / "venv" / bin_dir / exe
 
     def is_installed(self, tools_dir: Path, platform: Platform) -> bool:

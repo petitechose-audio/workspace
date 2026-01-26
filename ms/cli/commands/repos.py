@@ -4,6 +4,8 @@ import typer
 
 from ms.cli.context import build_context
 from ms.core.errors import ErrorCode
+from ms.core.result import Err, Ok
+from ms.output.console import Style
 from ms.services.repos import RepoService
 
 
@@ -18,6 +20,12 @@ def sync(
     """Clone/update all repos from GitHub orgs."""
     ctx = build_context()
     service = RepoService(workspace=ctx.workspace, console=ctx.console)
-    ok = service.sync_all(limit=limit, dry_run=dry_run)
-    if not ok:
-        raise typer.Exit(code=int(ErrorCode.ENV_ERROR))
+    result = service.sync_all(limit=limit, dry_run=dry_run)
+    match result:
+        case Ok(_):
+            pass
+        case Err(e):
+            ctx.console.error(e.message)
+            if e.hint:
+                ctx.console.print(f"hint: {e.hint}", Style.DIM)
+            raise typer.Exit(code=int(ErrorCode.ENV_ERROR))

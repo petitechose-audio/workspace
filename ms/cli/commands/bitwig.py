@@ -6,6 +6,8 @@ import typer
 
 from ms.cli.context import build_context
 from ms.core.errors import ErrorCode
+from ms.core.result import Err, Ok
+from ms.output.console import Style
 from ms.services.bitwig import BitwigService
 
 
@@ -24,9 +26,15 @@ def build(
         config=ctx.config,
         console=ctx.console,
     )
-    ok = service.build(dry_run=dry_run)
-    if not ok:
-        raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))
+    result = service.build(dry_run=dry_run)
+    match result:
+        case Ok(_):
+            pass
+        case Err(e):
+            ctx.console.error(e.message)
+            if e.hint:
+                ctx.console.print(f"hint: {e.hint}", Style.DIM)
+            raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))
 
 
 @bitwig_app.command("deploy")
@@ -46,6 +54,12 @@ def deploy(
         config=ctx.config,
         console=ctx.console,
     )
-    ok = service.deploy(extensions_dir=dir, dry_run=dry_run)
-    if not ok:
-        raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))
+    result = service.deploy(extensions_dir=dir, dry_run=dry_run)
+    match result:
+        case Ok(_):
+            pass
+        case Err(e):
+            ctx.console.error(e.message)
+            if e.hint:
+                ctx.console.print(f"hint: {e.hint}", Style.DIM)
+            raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))

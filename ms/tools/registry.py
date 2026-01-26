@@ -293,3 +293,63 @@ class ToolRegistry:
                     paths.append(bin_dir)
 
         return paths
+
+    # -------------------------------------------------------------------------
+    # Tool-specific path accessors
+    # -------------------------------------------------------------------------
+
+    def get_sdl2_dll(self) -> Path | None:
+        """Get path to SDL2.dll (Windows only)."""
+        sdl2 = get_tool("sdl2")
+        if sdl2 is None or not self.is_installed(sdl2):
+            return None
+        return sdl2.bin_path(self._tools_dir, self._platform)
+
+    def get_sdl2_lib(self) -> Path | None:
+        """Get path to SDL2 import library (e.g., libSDL2.dll.a)."""
+        sdl2 = get_tool("sdl2")
+        if sdl2 is None or not self.is_installed(sdl2):
+            return None
+        from ms.tools.definitions.sdl2 import Sdl2Tool
+
+        if isinstance(sdl2, Sdl2Tool):
+            lib_dir = sdl2.lib_path(self._tools_dir)
+            return lib_dir / "libSDL2.dll.a"
+        return None
+
+    def get_emcmake(self) -> Path | None:
+        """Get path to emcmake (Emscripten cmake wrapper)."""
+        emscripten = get_tool("emscripten")
+        if emscripten is None or not self.is_installed(emscripten):
+            return None
+        from ms.tools.definitions.emscripten import EmscriptenTool
+
+        if isinstance(emscripten, EmscriptenTool):
+            return emscripten.emcmake_path(self._tools_dir, self._platform)
+        return None
+
+    def get_em_config(self) -> Path | None:
+        """Get path to Emscripten config file (.emscripten)."""
+        emscripten = get_tool("emscripten")
+        if emscripten is None or not self.is_installed(emscripten):
+            return None
+        from ms.tools.definitions.emscripten import EmscriptenTool
+
+        if isinstance(emscripten, EmscriptenTool):
+            return emscripten.emsdk_home(self._tools_dir) / ".emscripten"
+        return None
+
+    def get_zig_wrapper(self, name: str) -> Path | None:
+        """Get path to a Zig wrapper script (e.g., zig-cc.cmd).
+
+        Args:
+            name: Wrapper name without extension (e.g., "zig-cc")
+
+        Returns:
+            Path to wrapper if Zig is installed, None otherwise
+        """
+        zig = get_tool("zig")
+        if zig is None or not self.is_installed(zig):
+            return None
+        ext = ".cmd" if self._platform.is_windows else ""
+        return self._tools_dir / "bin" / f"{name}{ext}"

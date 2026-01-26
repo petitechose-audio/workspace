@@ -72,7 +72,7 @@ class WrapperGenerator:
         """
         self._bin_dir.mkdir(parents=True, exist_ok=True)
 
-        if str(platform).lower() == "windows":
+        if platform.is_windows:
             return self._generate_cmd(spec)
         else:
             return self._generate_bash(spec)
@@ -173,7 +173,7 @@ def create_emscripten_wrappers(
     emscripten_dir = emsdk_dir / "upstream" / "emscripten"
     env = {"EMSDK": str(emsdk_dir)}
 
-    if str(platform).lower() == "windows":
+    if platform.is_windows:
         emcc = emscripten_dir / "emcc.bat"
         emcmake = emscripten_dir / "emcmake.bat"
     else:
@@ -207,7 +207,7 @@ def create_zig_wrappers(
         List of paths to generated wrappers
     """
     generator = WrapperGenerator(bin_dir)
-    zig_exe = zig_dir / ("zig.exe" if str(platform).lower() == "windows" else "zig")
+    zig_exe = zig_dir / ("zig.exe" if platform.is_windows else "zig")
 
     specs = [
         WrapperSpec(

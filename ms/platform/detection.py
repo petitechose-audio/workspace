@@ -42,6 +42,21 @@ class Platform(Enum):
         return self.name.lower()
 
     @property
+    def is_windows(self) -> bool:
+        """Check if this is Windows."""
+        return self == Platform.WINDOWS
+
+    @property
+    def is_linux(self) -> bool:
+        """Check if this is Linux."""
+        return self == Platform.LINUX
+
+    @property
+    def is_macos(self) -> bool:
+        """Check if this is macOS."""
+        return self == Platform.MACOS
+
+    @property
     def is_unix(self) -> bool:
         """Check if this is a Unix-like platform (Linux or macOS)."""
         return self in (Platform.LINUX, Platform.MACOS)

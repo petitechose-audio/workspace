@@ -1,77 +1,31 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import typer
 
 from ms.cli.context import build_context
+from ms.core.config import CONTROLLER_CORE_NATIVE_PORT
 from ms.core.errors import ErrorCode
 from ms.core.result import Err, Ok
 from ms.output.console import Style
-from ms.services.build import (
-    AppConfigInvalid,
-    BuildError,
-    BuildService,
-    AppNotFound,
-    CompileFailed,
-    ConfigureFailed,
-    OutputMissing,
-    PrereqMissing,
-    SdlAppNotFound,
-    ToolMissing,
-)
+from ms.output.errors import build_error_exit_code, print_build_error
+from ms.services.build import BuildService
+
+if TYPE_CHECKING:
+    from ms.cli.context import CLIContext
 
 VALID_TARGETS = ("native", "wasm")
 
 
-def _validate_target(target: str, ctx: object) -> Literal["native", "wasm"] | None:
+def _validate_target(target: str, ctx: "CLIContext") -> Literal["native", "wasm"] | None:
     """Validate target argument, return None if invalid."""
     if target in VALID_TARGETS:
         return target  # type: ignore[return-value]
 
-    ctx.console.error(f"Unknown target: {target}")  # type: ignore[union-attr]
-    ctx.console.print(f"Available: {', '.join(VALID_TARGETS)}", Style.DIM)  # type: ignore[union-attr]
+    ctx.console.error(f"Unknown target: {target}")
+    ctx.console.print(f"Available: {', '.join(VALID_TARGETS)}", Style.DIM)
     return None
-
-
-def _print_build_error(error: BuildError, console: object) -> None:
-    """Print build error to console."""
-    match error:
-        case AppNotFound(name=name, available=available):
-            console.error(f"Unknown app_name: {name}")  # type: ignore[union-attr]
-            if available:
-                console.print(f"Available: {', '.join(available)}", Style.DIM)  # type: ignore[union-attr]
-        case SdlAppNotFound(app_name=app_name):
-            console.error(f"SDL app not found for app_name: {app_name}")  # type: ignore[union-attr]
-        case AppConfigInvalid(path=path, reason=reason):
-            console.error(f"Invalid app config: {path} ({reason})")  # type: ignore[union-attr]
-        case ToolMissing(tool_id=tool_id, hint=hint):
-            console.error(f"{tool_id}: missing")  # type: ignore[union-attr]
-            console.print(f"hint: {hint}", Style.DIM)  # type: ignore[union-attr]
-        case PrereqMissing(name=name, hint=hint):
-            console.error(f"{name}: missing")  # type: ignore[union-attr]
-            console.print(f"hint: {hint}", Style.DIM)  # type: ignore[union-attr]
-        case ConfigureFailed(returncode=rc):
-            console.error(f"cmake configure failed (exit {rc})")  # type: ignore[union-attr]
-        case CompileFailed(returncode=rc):
-            console.error(f"build failed (exit {rc})")  # type: ignore[union-attr]
-        case OutputMissing(path=path):
-            console.error(f"output not found: {path}")  # type: ignore[union-attr]
-
-
-def _error_to_exit_code(error: BuildError) -> int:
-    """Convert BuildError to exit code."""
-    match error:
-        case AppNotFound():
-            return int(ErrorCode.USER_ERROR)
-        case SdlAppNotFound() | AppConfigInvalid():
-            return int(ErrorCode.ENV_ERROR)
-        case ToolMissing() | PrereqMissing():
-            return int(ErrorCode.ENV_ERROR)
-        case ConfigureFailed() | CompileFailed():
-            return int(ErrorCode.BUILD_ERROR)
-        case OutputMissing():
-            return int(ErrorCode.IO_ERROR)
 
 
 def build(
@@ -103,8 +57,8 @@ def build(
         case Ok(output_path):
             ctx.console.success(str(output_path))
         case Err(error):
-            _print_build_error(error, ctx.console)
-            raise typer.Exit(code=_error_to_exit_code(error))
+            print_build_error(error, ctx.console)
+            raise typer.Exit(code=build_error_exit_code(error))
 
 
 def run(
@@ -124,7 +78,7 @@ def run(
 
 def web(
     app_name: str = typer.Argument(..., help="App: core, bitwig, ..."),
-    port: int = typer.Option(8000, "--port", "-p", help="HTTP server port"),
+    port: int = typer.Option(CONTROLLER_CORE_NATIVE_PORT, "--port", "-p", help="HTTP server port"),
 ) -> None:
     """Build and serve WASM simulator."""
     ctx = build_context()

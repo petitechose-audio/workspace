@@ -89,7 +89,7 @@ class TestErrorCodeEnum:
     def test_all_codes_exist(self) -> None:
         """Ensure all expected codes are defined."""
         codes = list(ErrorCode)
-        assert len(codes) == 6
+        assert len(codes) == 7
 
     def test_codes_are_unique(self) -> None:
         """Ensure no duplicate values."""
@@ -97,9 +97,9 @@ class TestErrorCodeEnum:
         assert len(values) == len(set(values))
 
     def test_codes_are_sequential(self) -> None:
-        """Ensure codes are 0-5."""
+        """Ensure codes are 0-6."""
         values = sorted(code.value for code in ErrorCode)
-        assert values == [0, 1, 2, 3, 4, 5]
+        assert values == [0, 1, 2, 3, 4, 5, 6]
 
     def test_lookup_by_name(self) -> None:
         """Can look up code by name."""
