@@ -30,13 +30,6 @@ arch = "Run: uv run ms tools sync"
 macos = "Run: uv run ms tools sync"
 windows = "Run: uv run ms tools sync"
 
-[tools.zig]
-fedora = "Run: uv run ms tools sync"
-debian = "Run: uv run ms tools sync"
-arch = "Run: uv run ms tools sync"
-macos = "Run: uv run ms tools sync"
-windows = "Run: uv run ms tools sync"
-
 [tools.bun]
 fedora = "Run: uv run ms tools sync"
 debian = "Run: uv run ms tools sync"

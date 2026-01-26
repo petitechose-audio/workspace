@@ -30,7 +30,6 @@ from ms.tools.definitions.ninja import NinjaTool
 from ms.tools.definitions.platformio import PlatformioTool
 from ms.tools.definitions.sdl2 import Sdl2Tool
 from ms.tools.definitions.uv import UvTool
-from ms.tools.definitions.zig import ZigTool
 
 if TYPE_CHECKING:
     from ms.tools.base import Tool
@@ -47,7 +46,6 @@ __all__ = [
     "PlatformioTool",
     "Sdl2Tool",
     "UvTool",
-    "ZigTool",
     # Registry
     "ALL_TOOLS",
     "get_tool",
@@ -59,7 +57,6 @@ __all__ = [
 ALL_TOOLS: tuple[Tool, ...] = (
     NinjaTool(),
     CMakeTool(),
-    ZigTool(),
     BunTool(),
     UvTool(),
     JdkTool(),
