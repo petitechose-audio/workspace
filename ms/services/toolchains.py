@@ -22,7 +22,6 @@ from ms.tools.wrapper import (
     WrapperGenerator,
     WrapperSpec,
     create_emscripten_wrappers,
-    create_zig_wrappers,
 )
 
 
@@ -205,13 +204,6 @@ class ToolchainService:
     def _generate_wrappers(self, wrapper_gen: WrapperGenerator, *, dry_run: bool) -> None:
         if dry_run:
             return
-
-        # zig-cc / zig-cxx
-        zig = self._registry.get_tool("zig")
-        if zig and zig.is_installed(self._paths.tools_dir, self._platform.platform):
-            zig_path = zig.bin_path(self._paths.tools_dir, self._platform.platform)
-            if zig_path is not None:
-                create_zig_wrappers(zig_path, self._paths.bin_dir, self._platform.platform)
 
         # emcc/emcmake wrappers
         emsdk_dir = self._paths.tools_dir / "emsdk"

@@ -173,7 +173,8 @@ class TestSystemCheckerWindows:
 
     def test_sdl2_bundled_found(self, tmp_path: Path) -> None:
         tools_dir = tmp_path / "tools"
-        sdl2_dir = tools_dir / "windows" / "SDL2" / "lib"
+        # SDL2 VC package structure: tools/sdl2/lib/
+        sdl2_dir = tools_dir / "sdl2" / "lib"
         sdl2_dir.mkdir(parents=True)
 
         checker = SystemChecker(platform=Platform.WINDOWS, tools_dir=tools_dir)
@@ -184,9 +185,10 @@ class TestSystemCheckerWindows:
         assert results[0].status == CheckStatus.OK
         assert "bundled" in results[0].message
 
-    def test_sdl2_bundled_alternative_path(self, tmp_path: Path) -> None:
+    def test_sdl2_bundled_with_include(self, tmp_path: Path) -> None:
         tools_dir = tmp_path / "tools"
-        sdl2_dir = tools_dir / "SDL2" / "include"
+        # SDL2 VC package also has include dir
+        sdl2_dir = tools_dir / "sdl2" / "include"
         sdl2_dir.mkdir(parents=True)
 
         checker = SystemChecker(platform=Platform.WINDOWS, tools_dir=tools_dir)

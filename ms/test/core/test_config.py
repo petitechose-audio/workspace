@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from ms.core.config import (
+    BitwigPathsConfig,
     Config,
     ConfigError,
     ControllerPortsConfig,
@@ -81,6 +82,18 @@ class TestPathsConfig:
         assert config.tools == "tools"
 
 
+class TestBitwigPathsConfig:
+    """Test BitwigPathsConfig parsing and helpers."""
+
+    def test_defaults(self) -> None:
+        cfg = BitwigPathsConfig()
+        assert cfg.as_dict() == {}
+
+    def test_as_dict(self) -> None:
+        cfg = BitwigPathsConfig(linux="/tmp/a", macos=None, windows="C:/X")
+        assert cfg.as_dict() == {"linux": "/tmp/a", "windows": "C:/X"}
+
+
 class TestConfig:
     """Test main Config class."""
 
@@ -89,6 +102,7 @@ class TestConfig:
         assert isinstance(config.ports, PortsConfig)
         assert isinstance(config.midi, MidiConfig)
         assert isinstance(config.paths, PathsConfig)
+        assert isinstance(config.bitwig, BitwigPathsConfig)
 
     def test_from_dict_empty(self) -> None:
         config = Config.from_dict({})
@@ -131,12 +145,16 @@ class TestConfig:
                 "extension": "custom/ext",
                 "tools": "custom/tools",
             },
+            "bitwig": {
+                "windows": "%USERPROFILE%/Documents/Bitwig Studio/Extensions",
+            },
         }
         config = Config.from_dict(data)
         assert config.ports.hardware == 1000
         assert config.ports.controller.core_native == 2000
         assert config.midi.linux == "Lin"
         assert config.paths.bridge == "custom/bridge"
+        assert config.bitwig.windows == "%USERPROFILE%/Documents/Bitwig Studio/Extensions"
 
 
 class TestLoadConfig:

@@ -107,13 +107,18 @@ class WorkspaceChecker:
     def check_bridge(self) -> CheckResult:
         """Check oc-bridge binary is built."""
         bridge_dir = self._get_bridge_dir()
-        bridge_bin = bridge_dir / "target" / "release" / self._exe_name("oc-bridge")
+        exe_name = self._exe_name("oc-bridge")
+        installed_bin = self.workspace.bin_dir / "bridge" / exe_name
+        if installed_bin.exists():
+            return CheckResult.success("oc-bridge", f"installed ({installed_bin})")
+
+        bridge_bin = bridge_dir / "target" / "release" / exe_name
         if bridge_bin.exists():
-            return CheckResult.success("oc-bridge", "built")
+            return CheckResult.success("oc-bridge", f"built ({bridge_bin})")
         return CheckResult.warning(
             "oc-bridge",
             "not built",
-            hint="Run: cargo build --release (in open-control/bridge)",
+            hint="Run: uv run ms bridge build",
         )
 
     def check_bitwig_host(self) -> CheckResult:

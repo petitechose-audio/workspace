@@ -46,7 +46,7 @@ class CheckService:
         hints = load_hints()
 
         tools_dir = self._resolve_tools_dir()
-        bitwig_paths = self._resolve_bitwig_paths()
+        bitwig_paths = self.resolve_bitwig_paths()
 
         workspace_checker = WorkspaceChecker(
             workspace=self._workspace,
@@ -87,7 +87,7 @@ class CheckService:
             return self._workspace.root / self._config.paths.tools
         return self._workspace.root / "tools"
 
-    def _resolve_bitwig_paths(self) -> dict[str, str]:
-        # Config currently does not expose bitwig paths in a typed way.
-        # The workspace checker will fall back to platform defaults.
-        return {}
+    def resolve_bitwig_paths(self) -> dict[str, str]:
+        if self._config is None:
+            return {}
+        return self._config.bitwig.as_dict()

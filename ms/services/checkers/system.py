@@ -131,11 +131,9 @@ class SystemChecker:
         results: list[CheckResult] = []
 
         if self.tools_dir:
+            # SDL2 VC package location (downloaded by ms tools sync)
             sdl2_candidates = [
-                self.tools_dir / "windows" / "SDL2",
                 self.tools_dir / "sdl2",
-                self.tools_dir / "SDL2",
-                self.tools_dir / "sdl2" / "x86_64-w64-mingw32",
             ]
             sdl2_found = any(
                 (p / "lib").is_dir()

@@ -20,7 +20,7 @@ from ms.tools.definitions import ALL_TOOLS, get_tool, get_tools_by_mode
 from ms.tools.http import MockHttpClient
 from ms.tools.registry import ToolRegistry
 from ms.tools.state import get_installed_version, set_installed_version
-from ms.tools.wrapper import WrapperGenerator, WrapperSpec, create_zig_wrappers
+from ms.tools.wrapper import WrapperGenerator, WrapperSpec
 
 
 class TestToolDefinitionsIntegration:
@@ -81,7 +81,7 @@ class TestToolRegistryIntegration:
     def test_registry_lists_all_tools(self, registry: ToolRegistry) -> None:
         """Registry returns all tools."""
         tools = registry.all_tools()
-        assert len(tools) == 11
+        assert len(tools) == 10  # Without Zig
 
     def test_registry_tracks_installation_status(
         self, registry: ToolRegistry, tmp_path: Path
@@ -142,25 +142,22 @@ class TestVersionResolutionIntegration:
         assert isinstance(result, Ok)
         assert result.value == "1.12.1"
 
-    def test_zig_version_resolution(self) -> None:
-        """Zig version resolution works with mocked HTTP."""
+    def test_cmake_version_resolution(self) -> None:
+        """CMake version resolution works with mocked HTTP."""
         client = MockHttpClient()
         client.set_json(
-            "https://ziglang.org/download/index.json",
-            {
-                "0.13.0": {"x86_64-linux": {"tarball": "https://..."}},
-                "0.12.0": {},
-            },
+            "https://api.github.com/repos/Kitware/CMake/releases/latest",
+            {"tag_name": "v3.28.0"},
         )
 
-        tool = get_tool("zig")
+        tool = get_tool("cmake")
         assert tool is not None
 
         from ms.core.result import Ok
 
         result = tool.latest_version(client)
         assert isinstance(result, Ok)
-        assert result.value == "0.13.0"
+        assert result.value == "3.28.0"
 
 
 class TestStateManagementIntegration:
@@ -191,24 +188,6 @@ class TestStateManagementIntegration:
 
 class TestWrapperGenerationIntegration:
     """Integration tests for wrapper generation."""
-
-    def test_zig_wrappers_creation(self, tmp_path: Path) -> None:
-        """Zig wrappers are created correctly."""
-        zig_path = tmp_path / "zig" / "zig"
-        zig_path.parent.mkdir()
-        zig_path.touch()
-
-        bin_dir = tmp_path / "bin"
-        paths = create_zig_wrappers(zig_path, bin_dir, Platform.LINUX)
-
-        assert len(paths) == 2
-        assert all(p.exists() for p in paths)
-
-        # Check zig-cc content
-        zig_cc = next(p for p in paths if "zig-cc" in p.name)
-        content = zig_cc.read_text()
-        assert "cc" in content
-        assert "exec" in content
 
     def test_wrapper_with_env_vars(self, tmp_path: Path) -> None:
         """Wrapper can set environment variables."""
@@ -274,7 +253,7 @@ class TestEndToEndWorkflow:
     """End-to-end workflow tests."""
 
     def test_complete_tool_setup_workflow(self, tmp_path: Path) -> None:
-        """Complete workflow: registry -> status -> wrappers -> activation."""
+        """Complete workflow: registry -> status -> activation."""
         # Mock cargo to not be found (for predictable test)
         with patch("shutil.which", return_value=None):
             # 1. Create registry
@@ -293,34 +272,28 @@ class TestEndToEndWorkflow:
             ninja_dir.mkdir()
             (ninja_dir / "ninja").touch()
 
-            zig_dir = tmp_path / "zig"
-            zig_dir.mkdir()
-            (zig_dir / "zig").touch()
+            cmake_dir = tmp_path / "cmake" / "bin"
+            cmake_dir.mkdir(parents=True)
+            (cmake_dir / "cmake").touch()
 
             # 4. Track versions
             set_installed_version(tmp_path, "ninja", "1.12.1")
-            set_installed_version(tmp_path, "zig", "0.13.0")
+            set_installed_version(tmp_path, "cmake", "3.28.0")
 
             # 5. Check status again
             status = registry.get_status("ninja")
             assert status.installed
             assert status.version == "1.12.1"
 
-            # 6. Generate wrappers
-            bin_dir = tmp_path / "bin"
-            create_zig_wrappers(tmp_path / "zig" / "zig", bin_dir, Platform.LINUX)
-            assert (bin_dir / "zig-cc").exists()
-
-            # 7. Get env vars and paths
+            # 6. Get env vars and paths
             env_vars = registry.get_env_vars()
             path_additions = registry.get_path_additions()
-            path_additions.append(bin_dir)  # Add wrapper bin dir
 
-            # 8. Generate activation scripts
+            # 7. Generate activation scripts
             scripts = generate_activation_scripts(
                 tmp_path, env_vars, path_additions, Platform.LINUX
             )
 
             assert scripts["bash"].exists()
             content = scripts["bash"].read_text()
-            assert "ninja" in content or "zig" in content
+            assert "ninja" in content or "cmake" in content

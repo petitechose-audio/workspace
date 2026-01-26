@@ -3,7 +3,7 @@
 
 Validates that required build tools are installed:
 - System tools: git, gh, uv, cargo
-- Bundled tools: cmake, ninja, zig, bun, jdk, maven, platformio
+- Bundled tools: cmake, ninja, bun, jdk, maven, platformio
 """
 
 from __future__ import annotations
@@ -64,12 +64,10 @@ class ToolsChecker:
             MavenTool,
             NinjaTool,
             PlatformioTool,
-            ZigTool,
         )
 
         results.append(self.check_bundled_tool(CMakeTool(), ["--version"]))
         results.append(self.check_bundled_tool(NinjaTool(), ["--version"]))
-        results.append(self.check_bundled_tool(ZigTool(), ["version"]))
         results.append(self.check_bundled_tool(BunTool(), ["--version"], required=False))
         results.append(self.check_bundled_tool(JdkTool(), ["-version"]))
         results.append(self.check_bundled_tool(MavenTool(), ["-version"]))

@@ -8,12 +8,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .result import Err, Ok, Result
 
 __all__ = [
     "Config",
+    "BitwigPathsConfig",
     "PortsConfig",
     "ControllerPortsConfig",
     "MidiConfig",
@@ -62,6 +63,30 @@ class MidiConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class BitwigPathsConfig:
+    """Bitwig extension deployment paths per platform.
+
+    Values are user-provided paths (typically absolute). They can include:
+    - ~ (home)
+    - environment variables (e.g. %USERPROFILE% on Windows)
+    """
+
+    linux: str | None = None
+    macos: str | None = None
+    windows: str | None = None
+
+    def as_dict(self) -> dict[str, str]:
+        out: dict[str, str] = {}
+        if self.linux:
+            out["linux"] = self.linux
+        if self.macos:
+            out["macos"] = self.macos
+        if self.windows:
+            out["windows"] = self.windows
+        return out
+
+
+@dataclass(frozen=True, slots=True)
 class PathsConfig:
     """Relative paths within workspace."""
 
@@ -77,6 +102,7 @@ class Config:
     ports: PortsConfig = field(default_factory=PortsConfig)
     midi: MidiConfig = field(default_factory=MidiConfig)
     paths: PathsConfig = field(default_factory=PathsConfig)
+    bitwig: BitwigPathsConfig = field(default_factory=BitwigPathsConfig)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Config":
@@ -88,6 +114,13 @@ class Config:
         )
         midi_data: dict[str, Any] = data.get("midi", {})
         paths_data: dict[str, Any] = data.get("paths", {})
+        bitwig_section: Any = data.get("bitwig", {})
+        bitwig_data: dict[str, Any] = {}
+        if isinstance(bitwig_section, dict):
+            section = cast(dict[object, object], bitwig_section)
+            for k, v in section.items():
+                if isinstance(k, str):
+                    bitwig_data[k] = v
 
         return cls(
             ports=PortsConfig(
@@ -111,6 +144,11 @@ class Config:
                 bridge=str(paths_data.get("bridge", "open-control/bridge")),
                 extension=str(paths_data.get("extension", "midi-studio/plugin-bitwig/host")),
                 tools=str(paths_data.get("tools", "tools")),
+            ),
+            bitwig=BitwigPathsConfig(
+                linux=str(bitwig_data["linux"]) if bitwig_data.get("linux") else None,
+                macos=str(bitwig_data["macos"]) if bitwig_data.get("macos") else None,
+                windows=str(bitwig_data["windows"]) if bitwig_data.get("windows") else None,
             ),
         )
 
