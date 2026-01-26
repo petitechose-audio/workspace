@@ -2,9 +2,9 @@
 """System dependencies checker.
 
 Validates system-level dependencies:
-- Linux: SDL2, ALSA, pkg-config
-- macOS: SDL2 (via brew)
-- Windows: SDL2 (bundled)
+- Linux: SDL2, ALSA, libudev, pkg-config, C compiler
+- macOS: SDL2 (via brew), C compiler
+- Windows: SDL2 (bundled), C compiler
 """
 
 from __future__ import annotations
@@ -19,11 +19,24 @@ from ms.services.checkers.common import (
     CommandRunner,
     DefaultCommandRunner,
     Hints,
+    first_line,
     get_platform_key,
 )
 
 if TYPE_CHECKING:
     from ms.platform.detection import LinuxDistro, Platform
+
+
+# Declarative dependency definitions: (display_name, pkg_config_name, hint_key)
+_LINUX_PKG_CONFIG_DEPS: list[tuple[str, str, str]] = [
+    ("SDL2", "sdl2", "sdl2"),
+    ("ALSA", "alsa", "alsa"),
+    ("libudev", "libudev", "libudev"),
+]
+
+# C compiler candidates by platform
+_C_COMPILERS_UNIX = ("cc", "gcc", "clang")
+_C_COMPILERS_WINDOWS = ("cl", "gcc", "clang")
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,41 +75,21 @@ class SystemChecker:
         """Check Linux system dependencies."""
         results: list[CheckResult] = []
 
-        # pkg-config is required for SDL2/ALSA detection
-        pkg_config = shutil.which("pkg-config")
-        if not pkg_config:
-            results.append(
-                CheckResult.error(
-                    "pkg-config",
-                    "missing",
-                    hint=self._get_system_hint("pkg-config"),
+        # pkg-config is required for library detection
+        has_pkg_config = self._check_pkg_config(results)
+
+        # Check libraries via pkg-config
+        if has_pkg_config:
+            for display_name, pkg_name, hint_key in _LINUX_PKG_CONFIG_DEPS:
+                results.append(self._check_pkg_config_lib(display_name, pkg_name, hint_key))
+        else:
+            for display_name, _, _ in _LINUX_PKG_CONFIG_DEPS:
+                results.append(
+                    CheckResult.warning(display_name, "cannot check (pkg-config missing)")
                 )
-            )
-            results.append(CheckResult.warning("SDL2", "cannot check (pkg-config missing)"))
-            results.append(CheckResult.warning("ALSA", "cannot check (pkg-config missing)"))
-            return results
 
-        results.append(CheckResult.success("pkg-config", "ok"))
-
-        # Check SDL2
-        sdl2_result = self.runner.run(["pkg-config", "--exists", "sdl2"])
-        if sdl2_result.returncode == 0:
-            version_result = self.runner.run(["pkg-config", "--modversion", "sdl2"])
-            version = version_result.stdout.strip() if version_result.returncode == 0 else ""
-            msg = f"ok ({version})" if version else "ok"
-            results.append(CheckResult.success("SDL2", msg))
-        else:
-            results.append(CheckResult.error("SDL2", "missing", hint=self._get_system_hint("sdl2")))
-
-        # Check ALSA
-        alsa_result = self.runner.run(["pkg-config", "--exists", "alsa"])
-        if alsa_result.returncode == 0:
-            version_result = self.runner.run(["pkg-config", "--modversion", "alsa"])
-            version = version_result.stdout.strip() if version_result.returncode == 0 else ""
-            msg = f"ok ({version})" if version else "ok"
-            results.append(CheckResult.success("ALSA", msg))
-        else:
-            results.append(CheckResult.error("ALSA", "missing", hint=self._get_system_hint("alsa")))
+        # C compiler (independent of pkg-config)
+        results.append(self._check_c_compiler(_C_COMPILERS_UNIX))
 
         return results
 
@@ -104,59 +97,97 @@ class SystemChecker:
         """Check macOS system dependencies."""
         results: list[CheckResult] = []
 
-        brew = shutil.which("brew")
-        if not brew:
+        # Homebrew check
+        if not shutil.which("brew"):
             results.append(
                 CheckResult.error(
-                    "brew",
-                    "missing (required for SDL2)",
-                    hint="Install from https://brew.sh",
+                    "brew", "missing (required for SDL2)", hint="Install from https://brew.sh"
                 )
             )
             results.append(CheckResult.warning("SDL2", "cannot check (brew missing)"))
-            return results
-
-        results.append(CheckResult.success("brew", "ok"))
-
-        sdl2_result = self.runner.run(["brew", "list", "sdl2"])
-        if sdl2_result.returncode == 0:
-            results.append(CheckResult.success("SDL2", "ok"))
         else:
-            results.append(CheckResult.error("SDL2", "missing", hint=self._get_system_hint("sdl2")))
+            results.append(CheckResult.success("brew", "ok"))
+            results.append(self._check_brew_package("SDL2", "sdl2"))
 
+        results.append(self._check_c_compiler(_C_COMPILERS_UNIX))
         return results
 
     def _check_windows(self) -> list[CheckResult]:
         """Check Windows system dependencies."""
         results: list[CheckResult] = []
-
-        if self.tools_dir:
-            # SDL2 VC package location (downloaded by ms tools sync)
-            sdl2_candidates = [
-                self.tools_dir / "sdl2",
-            ]
-            sdl2_found = any(
-                (p / "lib").is_dir()
-                or (p / "include").is_dir()
-                or (p / "bin" / "SDL2.dll").is_file()
-                for p in sdl2_candidates
-            )
-            if sdl2_found:
-                results.append(CheckResult.success("SDL2", "ok (bundled)"))
-            else:
-                results.append(
-                    CheckResult.warning(
-                        "SDL2",
-                        "not found",
-                        hint="Run: uv run ms tools sync",
-                    )
-                )
-        else:
-            results.append(CheckResult.warning("SDL2", "cannot check (tools_dir not set)"))
-
+        results.append(self._check_sdl2_bundled())
+        results.append(self._check_c_compiler(_C_COMPILERS_WINDOWS))
         return results
 
-    def _get_system_hint(self, dep_id: str) -> str | None:
+    # -------------------------------------------------------------------------
+    # Reusable check methods
+    # -------------------------------------------------------------------------
+
+    def _check_pkg_config(self, results: list[CheckResult]) -> bool:
+        """Check if pkg-config is available. Appends result and returns availability."""
+        if shutil.which("pkg-config"):
+            results.append(CheckResult.success("pkg-config", "ok"))
+            return True
+        results.append(
+            CheckResult.error("pkg-config", "missing", hint=self._get_hint("pkg-config"))
+        )
+        return False
+
+    def _check_pkg_config_lib(self, display_name: str, pkg_name: str, hint_key: str) -> CheckResult:
+        """Check a library via pkg-config."""
+        result = self.runner.run(["pkg-config", "--exists", pkg_name])
+        if result.returncode != 0:
+            return CheckResult.error(display_name, "missing", hint=self._get_hint(hint_key))
+
+        version_result = self.runner.run(["pkg-config", "--modversion", pkg_name])
+        version = version_result.stdout.strip() if version_result.returncode == 0 else ""
+        msg = f"ok ({version})" if version else "ok"
+        return CheckResult.success(display_name, msg)
+
+    def _check_brew_package(self, display_name: str, package: str) -> CheckResult:
+        """Check a Homebrew package."""
+        result = self.runner.run(["brew", "list", package])
+        if result.returncode == 0:
+            return CheckResult.success(display_name, "ok")
+        return CheckResult.error(display_name, "missing", hint=self._get_hint(package))
+
+    def _check_sdl2_bundled(self) -> CheckResult:
+        """Check for bundled SDL2 on Windows."""
+        if not self.tools_dir:
+            return CheckResult.warning("SDL2", "cannot check (tools_dir not set)")
+
+        sdl2_path = self.tools_dir / "sdl2"
+        if (
+            (sdl2_path / "lib").is_dir()
+            or (sdl2_path / "include").is_dir()
+            or (sdl2_path / "bin" / "SDL2.dll").is_file()
+        ):
+            return CheckResult.success("SDL2", "ok (bundled)")
+
+        return CheckResult.warning("SDL2", "not found", hint="Run: uv run ms tools sync")
+
+    def _check_c_compiler(self, candidates: tuple[str, ...]) -> CheckResult:
+        """Check for a working C compiler from candidates list."""
+        for compiler in candidates:
+            path = shutil.which(compiler)
+            if not path:
+                continue
+
+            # Try to get version info
+            version_result = self.runner.run([compiler, "--version"])
+            if version_result.returncode == 0:
+                version = first_line(version_result.stdout + version_result.stderr)
+                return CheckResult.success("C compiler", f"ok ({version})" if version else "ok")
+
+            return CheckResult.success("C compiler", f"ok ({compiler})")
+
+        return CheckResult.error(
+            "C compiler",
+            f"missing ({'/'.join(candidates)} not found)",
+            hint=self._get_hint("cc"),
+        )
+
+    def _get_hint(self, dep_id: str) -> str | None:
         """Get installation hint for a system dependency."""
         platform_key = get_platform_key(self.platform, self.distro)
         return self.hints.get_system_hint(dep_id, platform_key)

@@ -8,6 +8,7 @@ from ms.cli.commands.bridge import bridge
 from ms.cli.commands.check import check
 from ms.cli.commands.clean import clean
 from ms.cli.commands.core import core
+from ms.cli.commands.prereqs import prereqs
 from ms.cli.commands.setup import setup
 from ms.cli.commands.status import status
 from ms.cli.commands.sync import sync
@@ -23,6 +24,7 @@ app = typer.Typer(
 
 # Commands
 app.command()(check)
+app.command()(prereqs)
 app.command()(setup)
 app.command()(sync)
 app.command()(tools)

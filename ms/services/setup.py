@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Callable, Literal
 
 from ms.core.config import Config
 from ms.core.result import Err, Ok, Result
@@ -12,6 +12,7 @@ from ms.platform.detection import PlatformInfo
 from ms.platform.process import run_silent
 from ms.services.check import CheckService
 from ms.services.repos import RepoService
+from ms.services.prereqs import PrereqsService
 from ms.services.toolchains import ToolchainService
 
 
@@ -24,7 +25,14 @@ from ms.services.toolchains import ToolchainService
 class SetupError:
     """Error from setup operations."""
 
-    kind: Literal["mode_unsupported", "repos_failed", "tools_failed", "python_failed", "check_failed"]
+    kind: Literal[
+        "mode_unsupported",
+        "repos_failed",
+        "tools_failed",
+        "python_failed",
+        "check_failed",
+        "system_deps_failed",
+    ]
     message: str
     hint: str | None = None
 
@@ -37,11 +45,13 @@ class SetupService:
         platform: PlatformInfo,
         config: Config | None,
         console: ConsoleProtocol,
+        confirm: Callable[[str], bool] | None = None,
     ) -> None:
         self._workspace = workspace
         self._platform = platform
         self._config = config
         self._console = console
+        self._confirm = confirm
 
     def setup_dev(
         self,
@@ -51,7 +61,9 @@ class SetupService:
         skip_tools: bool,
         skip_python: bool,
         skip_check: bool,
+        skip_prereqs: bool = False,
         dry_run: bool,
+        assume_yes: bool = False,
     ) -> Result[None, SetupError]:
         if mode.lower() != "dev":
             return Err(
@@ -69,6 +81,33 @@ class SetupService:
             self._workspace.build_dir.mkdir(parents=True, exist_ok=True)
             self._workspace.bin_dir.mkdir(parents=True, exist_ok=True)
             self._write_state(mode="dev")
+
+        # Check and install host dependencies first.
+        if not skip_prereqs:
+            prereqs_result = PrereqsService(
+                workspace=self._workspace,
+                platform=self._platform,
+                config=self._config,
+                console=self._console,
+                confirm=self._confirm,
+            ).ensure(
+                require_git=(not skip_repos) or (not skip_tools),
+                require_gh=not skip_repos,
+                require_gh_auth=not skip_repos,
+                require_uv=not skip_python,
+                install=True,
+                dry_run=dry_run,
+                assume_yes=assume_yes,
+                fail_if_missing=not dry_run,
+            )
+            if isinstance(prereqs_result, Err):
+                return Err(
+                    SetupError(
+                        kind="system_deps_failed",
+                        message=prereqs_result.error.message,
+                        hint=prereqs_result.error.hint,
+                    )
+                )
 
         if not skip_repos:
             self._console.header("Repos")

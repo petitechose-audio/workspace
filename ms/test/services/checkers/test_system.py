@@ -32,8 +32,8 @@ class MockCommandRunner:
         if key in self.responses:
             rc, stdout, stderr = self.responses[key]
             return subprocess.CompletedProcess(args, rc, stdout, stderr)
-        # Default: command not found
-        raise FileNotFoundError(f"Command not found: {args[0]}")
+        # Default: command failed
+        return subprocess.CompletedProcess(args, 1, "", "")
 
 
 class TestSystemCheckerLinux:
@@ -44,14 +44,18 @@ class TestSystemCheckerLinux:
         with patch("shutil.which", return_value=None):
             results = checker.check_all()
 
-        # Should have 3 results: pkg-config error, SDL2 warning, ALSA warning
-        assert len(results) == 3
+        # pkg-config error, SDL2/ALSA/libudev warnings, C compiler error
+        assert len(results) == 5
         assert results[0].name == "pkg-config"
         assert results[0].status == CheckStatus.ERROR
         assert results[1].name == "SDL2"
         assert results[1].status == CheckStatus.WARNING
         assert results[2].name == "ALSA"
         assert results[2].status == CheckStatus.WARNING
+        assert results[3].name == "libudev"
+        assert results[3].status == CheckStatus.WARNING
+        assert results[4].name == "C compiler"
+        assert results[4].status == CheckStatus.ERROR
 
     def test_sdl2_and_alsa_found(self) -> None:
         runner = MockCommandRunner(
@@ -60,13 +64,22 @@ class TestSystemCheckerLinux:
                 ("pkg-config", "--modversion", "sdl2"): (0, "2.28.5", ""),
                 ("pkg-config", "--exists", "alsa"): (0, "", ""),
                 ("pkg-config", "--modversion", "alsa"): (0, "1.2.10", ""),
+                ("pkg-config", "--exists", "libudev"): (0, "", ""),
+                ("pkg-config", "--modversion", "libudev"): (0, "255", ""),
+                ("cc", "--version"): (0, "cc 1.0", ""),
             }
         )
         checker = SystemChecker(platform=Platform.LINUX, runner=runner)
-        with patch("shutil.which", return_value="/usr/bin/pkg-config"):
+        with patch(
+            "shutil.which",
+            side_effect=lambda name: {
+                "pkg-config": "/usr/bin/pkg-config",
+                "cc": "/usr/bin/cc",
+            }.get(name),
+        ):
             results = checker.check_all()
 
-        assert len(results) == 3
+        assert len(results) == 5
         assert results[0].name == "pkg-config"
         assert results[0].status == CheckStatus.OK
         assert results[1].name == "SDL2"
@@ -75,6 +88,11 @@ class TestSystemCheckerLinux:
         assert results[2].name == "ALSA"
         assert results[2].status == CheckStatus.OK
         assert "1.2.10" in results[2].message
+        assert results[3].name == "libudev"
+        assert results[3].status == CheckStatus.OK
+        assert "255" in results[3].message
+        assert results[4].name == "C compiler"
+        assert results[4].status == CheckStatus.OK
 
     def test_sdl2_missing(self) -> None:
         hints = Hints(system={"sdl2": {"debian": "sudo apt install libsdl2-dev"}})
@@ -83,6 +101,9 @@ class TestSystemCheckerLinux:
                 ("pkg-config", "--exists", "sdl2"): (1, "", "No package 'sdl2' found"),
                 ("pkg-config", "--exists", "alsa"): (0, "", ""),
                 ("pkg-config", "--modversion", "alsa"): (0, "1.2.10", ""),
+                ("pkg-config", "--exists", "libudev"): (0, "", ""),
+                ("pkg-config", "--modversion", "libudev"): (0, "255", ""),
+                ("cc", "--version"): (0, "cc 1.0", ""),
             }
         )
         checker = SystemChecker(
@@ -91,7 +112,13 @@ class TestSystemCheckerLinux:
             hints=hints,
             runner=runner,
         )
-        with patch("shutil.which", return_value="/usr/bin/pkg-config"):
+        with patch(
+            "shutil.which",
+            side_effect=lambda name: {
+                "pkg-config": "/usr/bin/pkg-config",
+                "cc": "/usr/bin/cc",
+            }.get(name),
+        ):
             results = checker.check_all()
 
         sdl2_result = next(r for r in results if r.name == "SDL2")
@@ -105,6 +132,9 @@ class TestSystemCheckerLinux:
                 ("pkg-config", "--exists", "sdl2"): (0, "", ""),
                 ("pkg-config", "--modversion", "sdl2"): (0, "2.28.5", ""),
                 ("pkg-config", "--exists", "alsa"): (1, "", "No package 'alsa' found"),
+                ("pkg-config", "--exists", "libudev"): (0, "", ""),
+                ("pkg-config", "--modversion", "libudev"): (0, "255", ""),
+                ("cc", "--version"): (0, "cc 1.0", ""),
             }
         )
         checker = SystemChecker(
@@ -113,7 +143,13 @@ class TestSystemCheckerLinux:
             hints=hints,
             runner=runner,
         )
-        with patch("shutil.which", return_value="/usr/bin/pkg-config"):
+        with patch(
+            "shutil.which",
+            side_effect=lambda name: {
+                "pkg-config": "/usr/bin/pkg-config",
+                "cc": "/usr/bin/cc",
+            }.get(name),
+        ):
             results = checker.check_all()
 
         alsa_result = next(r for r in results if r.name == "ALSA")
@@ -129,38 +165,56 @@ class TestSystemCheckerMacOS:
         with patch("shutil.which", return_value=None):
             results = checker.check_all()
 
-        assert len(results) == 2
+        assert len(results) == 3
         assert results[0].name == "brew"
         assert results[0].status == CheckStatus.ERROR
         assert "brew.sh" in (results[0].hint or "")
         assert results[1].name == "SDL2"
         assert results[1].status == CheckStatus.WARNING
+        assert results[2].name == "C compiler"
+        assert results[2].status == CheckStatus.ERROR
 
     def test_sdl2_installed(self) -> None:
         runner = MockCommandRunner(
             {
                 ("brew", "list", "sdl2"): (0, "/opt/homebrew/Cellar/sdl2/2.28.5", ""),
+                ("cc", "--version"): (0, "cc 1.0", ""),
             }
         )
         checker = SystemChecker(platform=Platform.MACOS, runner=runner)
-        with patch("shutil.which", return_value="/opt/homebrew/bin/brew"):
+        with patch(
+            "shutil.which",
+            side_effect=lambda name: {
+                "brew": "/opt/homebrew/bin/brew",
+                "cc": "/usr/bin/cc",
+            }.get(name),
+        ):
             results = checker.check_all()
 
-        assert len(results) == 2
+        assert len(results) == 3
         assert results[0].name == "brew"
         assert results[0].status == CheckStatus.OK
         assert results[1].name == "SDL2"
         assert results[1].status == CheckStatus.OK
+        assert results[2].name == "C compiler"
+        assert results[2].status == CheckStatus.OK
 
     def test_sdl2_missing(self) -> None:
         hints = Hints(system={"sdl2": {"macos": "brew install sdl2"}})
         runner = MockCommandRunner(
             {
                 ("brew", "list", "sdl2"): (1, "", "Error: No such keg: sdl2"),
+                ("cc", "--version"): (0, "cc 1.0", ""),
             }
         )
         checker = SystemChecker(platform=Platform.MACOS, hints=hints, runner=runner)
-        with patch("shutil.which", return_value="/opt/homebrew/bin/brew"):
+        with patch(
+            "shutil.which",
+            side_effect=lambda name: {
+                "brew": "/opt/homebrew/bin/brew",
+                "cc": "/usr/bin/cc",
+            }.get(name),
+        ):
             results = checker.check_all()
 
         sdl2_result = next(r for r in results if r.name == "SDL2")
@@ -178,12 +232,14 @@ class TestSystemCheckerWindows:
         sdl2_dir.mkdir(parents=True)
 
         checker = SystemChecker(platform=Platform.WINDOWS, tools_dir=tools_dir)
-        results = checker.check_all()
+        with patch("shutil.which", return_value=None):
+            results = checker.check_all()
 
-        assert len(results) == 1
+        assert len(results) == 2
         assert results[0].name == "SDL2"
         assert results[0].status == CheckStatus.OK
         assert "bundled" in results[0].message
+        assert results[1].name == "C compiler"
 
     def test_sdl2_bundled_with_include(self, tmp_path: Path) -> None:
         tools_dir = tmp_path / "tools"
@@ -192,9 +248,10 @@ class TestSystemCheckerWindows:
         sdl2_dir.mkdir(parents=True)
 
         checker = SystemChecker(platform=Platform.WINDOWS, tools_dir=tools_dir)
-        results = checker.check_all()
+        with patch("shutil.which", return_value=None):
+            results = checker.check_all()
 
-        assert len(results) == 1
+        assert len(results) == 2
         assert results[0].name == "SDL2"
         assert results[0].status == CheckStatus.OK
 
@@ -203,21 +260,25 @@ class TestSystemCheckerWindows:
         tools_dir.mkdir()
 
         checker = SystemChecker(platform=Platform.WINDOWS, tools_dir=tools_dir)
-        results = checker.check_all()
+        with patch("shutil.which", return_value=None):
+            results = checker.check_all()
 
-        assert len(results) == 1
+        assert len(results) == 2
         assert results[0].name == "SDL2"
         assert results[0].status == CheckStatus.WARNING
         assert "ms tools sync" in (results[0].hint or "")
+        assert results[1].name == "C compiler"
 
     def test_no_tools_dir(self) -> None:
         checker = SystemChecker(platform=Platform.WINDOWS, tools_dir=None)
-        results = checker.check_all()
+        with patch("shutil.which", return_value=None):
+            results = checker.check_all()
 
-        assert len(results) == 1
+        assert len(results) == 2
         assert results[0].name == "SDL2"
         assert results[0].status == CheckStatus.WARNING
         assert "tools_dir not set" in results[0].message
+        assert results[1].name == "C compiler"
 
 
 class TestSystemCheckerUnknownPlatform:

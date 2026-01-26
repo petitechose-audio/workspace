@@ -180,7 +180,8 @@ class TestRuntimeCheckerLinuxSerialPermissions:
         with patch(
             "shutil.which", _which_factory({"lsmod": "/usr/sbin/lsmod", "id": "/usr/bin/id"})
         ):
-            results = checker.check_all()
+            with patch.object(Path, "exists", return_value=False):
+                results = checker.check_all()
 
         serial = next(r for r in results if r.name == "serial permissions")
         assert serial.status == CheckStatus.WARNING

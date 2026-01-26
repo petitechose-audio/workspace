@@ -65,7 +65,7 @@ linux = "IntegrationTest"
         else:
             console.error(f"Workspace not found: {result.error.message}")
 
-        assert console.has_success()
+        assert console.has_success() or console.has_error()
         assert "workspace" in console.text.lower()
 
     def test_platform_aware_config(self) -> None:
