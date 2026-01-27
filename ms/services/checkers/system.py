@@ -2,8 +2,8 @@
 """System dependencies checker.
 
 Validates system-level dependencies:
-- Linux: SDL2, ALSA, libudev, pkg-config, C compiler
-- macOS: SDL2 (via brew), C compiler
+- Linux: SDL2, ALSA, libudev, pkg-config, C/C++ compiler
+- macOS: SDL2 (via brew), C/C++ compiler
 - Windows: SDL2 (bundled), C compiler
 """
 
@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ms.services.checkers.base import CheckResult
-from ms.services.checkers.common import (
+from .base import CheckResult
+from .common import (
     CommandRunner,
     DefaultCommandRunner,
     Hints,
@@ -24,7 +24,7 @@ from ms.services.checkers.common import (
 )
 
 if TYPE_CHECKING:
-    from ms.platform.detection import LinuxDistro, Platform
+    from ...platform.detection import LinuxDistro, Platform
 
 
 # Declarative dependency definitions: (display_name, pkg_config_name, hint_key)
@@ -37,6 +37,9 @@ _LINUX_PKG_CONFIG_DEPS: list[tuple[str, str, str]] = [
 # C compiler candidates by platform
 _C_COMPILERS_UNIX = ("cc", "gcc", "clang")
 _C_COMPILERS_WINDOWS = ("cl", "gcc", "clang")
+
+# C++ compiler candidates by platform
+_CXX_COMPILERS_UNIX = ("c++", "g++", "clang++")
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +62,7 @@ class SystemChecker:
 
     def check_all(self) -> list[CheckResult]:
         """Run all system dependency checks."""
-        from ms.platform.detection import Platform
+        from ...platform.detection import Platform
 
         match self.platform:
             case Platform.LINUX:
@@ -91,6 +94,9 @@ class SystemChecker:
         # C compiler (independent of pkg-config)
         results.append(self._check_c_compiler(_C_COMPILERS_UNIX))
 
+        # C++ compiler (required by most of our native targets)
+        results.append(self._check_cxx_compiler(_CXX_COMPILERS_UNIX))
+
         return results
 
     def _check_macos(self) -> list[CheckResult]:
@@ -110,6 +116,7 @@ class SystemChecker:
             results.append(self._check_brew_package("SDL2", "sdl2"))
 
         results.append(self._check_c_compiler(_C_COMPILERS_UNIX))
+        results.append(self._check_cxx_compiler(_CXX_COMPILERS_UNIX))
         return results
 
     def _check_windows(self) -> list[CheckResult]:
@@ -187,7 +194,33 @@ class SystemChecker:
             hint=self._get_hint("cc"),
         )
 
+    def _check_cxx_compiler(self, candidates: tuple[str, ...]) -> CheckResult:
+        """Check for a working C++ compiler from candidates list."""
+        for compiler in candidates:
+            path = shutil.which(compiler)
+            if not path:
+                continue
+
+            version_result = self.runner.run([compiler, "--version"])
+            if version_result.returncode == 0:
+                version = first_line(version_result.stdout + version_result.stderr)
+                return CheckResult.success("C++ compiler", f"ok ({version})" if version else "ok")
+
+            return CheckResult.success("C++ compiler", f"ok ({compiler})")
+
+        hint = self._get_tool_hint("g++")
+        return CheckResult.error(
+            "C++ compiler",
+            f"missing ({'/'.join(candidates)} not found)",
+            hint=hint,
+        )
+
     def _get_hint(self, dep_id: str) -> str | None:
         """Get installation hint for a system dependency."""
         platform_key = get_platform_key(self.platform, self.distro)
         return self.hints.get_system_hint(dep_id, platform_key)
+
+    def _get_tool_hint(self, tool_id: str) -> str | None:
+        """Get installation hint for a tool."""
+        platform_key = get_platform_key(self.platform, self.distro)
+        return self.hints.get_tool_hint(tool_id, platform_key)

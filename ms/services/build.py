@@ -22,6 +22,7 @@ from ..core.result import Err, Ok, Result
 from ..output.console import Style
 from ..output.errors import build_error_exit_code, print_build_error
 from ..platform.process import run_silent
+from .checkers.common import get_platform_key, load_hints
 from .base import BaseService
 
 
@@ -163,6 +164,12 @@ class BuildService(BaseService):
             win_prereq = self._check_windows_native_prereqs()
             if isinstance(win_prereq, Err):
                 return win_prereq
+
+        # Unix-specific prereqs (Linux/macOS)
+        if self._platform.platform.is_unix:
+            unix_prereq = self._check_unix_native_prereqs()
+            if isinstance(unix_prereq, Err):
+                return unix_prereq
 
         # Setup build
         sdl_src = self._core_sdl_dir()
@@ -468,6 +475,18 @@ class BuildService(BaseService):
                 )
 
         return Ok(None)
+
+    def _check_unix_native_prereqs(self) -> Result[None, BuildError]:
+        """Check Linux/macOS native build prerequisites."""
+
+        # CMake projects here are C++-heavy; give a clear error before configure.
+        if shutil.which("c++") or shutil.which("g++") or shutil.which("clang++"):
+            return Ok(None)
+
+        hints = load_hints()
+        platform_key = get_platform_key(self._platform.platform, self._platform.distro)
+        hint = hints.get_tool_hint("g++", platform_key) or "Install a C++ compiler (g++/clang++)."
+        return Err(PrereqMissing(name="C++ compiler", hint=hint))
 
     def _get_emcmake_path(self) -> Result[Path, BuildError]:
         """Get emcmake.py path or error."""
