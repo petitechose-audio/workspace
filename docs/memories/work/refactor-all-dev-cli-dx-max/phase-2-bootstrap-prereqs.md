@@ -68,9 +68,14 @@
 
 - 2026-01-27: Phase created (no code changes yet).
 
+- 2026-01-27:
+  - Added user-level default workspace memory.
+  - Added `ms use`, `ms where`, `ms forget`.
+  - Added global `--workspace` override (maps to `WORKSPACE_ROOT` for the current invocation).
+
 ## Decisions
 
-- (pending)
+- Store the default workspace root in a dedicated user config file: `<user_config_dir>/workspace.toml`.
 
 ## Plan deviations
 
@@ -114,4 +119,7 @@ uv run pytest -m network
 - `ms/services/checkers/system.py`
 - `ms/cli/context.py`
 - `ms/core/workspace.py`
+- `ms/core/user_workspace.py`
+- `ms/cli/commands/workspace.py`
+- `ms/cli/app.py`
 - `ms/data/hints.toml`

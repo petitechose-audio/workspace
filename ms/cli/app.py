@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import typer
 
 from ms import __version__
@@ -13,6 +16,9 @@ from ms.cli.commands.setup import setup
 from ms.cli.commands.status import status
 from ms.cli.commands.sync import sync
 from ms.cli.commands.tools import tools
+from ms.cli.commands.workspace import forget, use, where
+from ms.core.errors import ErrorCode
+from ms.core.workspace import is_workspace_root
 
 
 app = typer.Typer(
@@ -33,15 +39,39 @@ app.command()(clean)
 app.command()(core)
 app.command()(bitwig)
 app.command()(bridge)
+app.command()(use)
+app.command()(where)
+app.command()(forget)
 
 
 @app.callback()
 def _main(  # pyright: ignore[reportUnusedFunction]
     version: bool = typer.Option(False, "--version", help="Show version and exit."),
+    workspace: Path | None = typer.Option(
+        None,
+        "--workspace",
+        help="Workspace root (overrides auto detection)",
+    ),
 ) -> None:
     if version:
         typer.echo(__version__)
         raise typer.Exit(code=0)
+
+    if workspace is not None:
+        try:
+            root = workspace.expanduser().resolve()
+        except OSError as e:
+            typer.echo(f"error: invalid --workspace: {e}", err=True)
+            raise typer.Exit(code=int(ErrorCode.USER_ERROR))
+
+        if not root.is_dir() or not is_workspace_root(root):
+            typer.echo(
+                f"error: --workspace '{root}' is not a valid workspace (missing .ms-workspace)",
+                err=True,
+            )
+            raise typer.Exit(code=int(ErrorCode.ENV_ERROR))
+
+        os.environ["WORKSPACE_ROOT"] = str(root)
 
 
 def main() -> None:

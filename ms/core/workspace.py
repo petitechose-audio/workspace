@@ -14,13 +14,18 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from .result import Err, Ok, Result
+from .user_workspace import get_default_workspace_root, user_workspace_config_path
 
 __all__ = [
     "Workspace",
+    "WorkspaceInfo",
+    "WorkspaceSource",
     "WorkspaceError",
     "detect_workspace",
+    "detect_workspace_info",
     "find_workspace_upward",
     "is_workspace_root",
 ]
@@ -139,6 +144,15 @@ class Workspace:
         return str(self.root)
 
 
+WorkspaceSource = Literal["env", "cwd", "remembered"]
+
+
+@dataclass(frozen=True, slots=True)
+class WorkspaceInfo:
+    workspace: Workspace
+    source: WorkspaceSource
+
+
 def is_workspace_root(path: Path) -> bool:
     """Check if a path is a workspace root.
 
@@ -164,26 +178,30 @@ def detect_workspace(
     start_dir: Path | None = None,
     env_var: str = "WORKSPACE_ROOT",
 ) -> Result[Workspace, WorkspaceError]:
-    """Detect the workspace root directory.
+    info = detect_workspace_info(start_dir=start_dir, env_var=env_var)
+    if isinstance(info, Err):
+        return info
+    return Ok(info.value.workspace)
+
+
+def detect_workspace_info(
+    *,
+    start_dir: Path | None = None,
+    env_var: str = "WORKSPACE_ROOT",
+) -> Result[WorkspaceInfo, WorkspaceError]:
+    """Detect the workspace root directory, with source metadata.
 
     Detection order:
     1. WORKSPACE_ROOT environment variable (if set and valid)
     2. Search upward from start_dir (or cwd) for workspace markers
-
-    Args:
-        start_dir: Directory to start searching from (defaults to cwd)
-        env_var: Environment variable name to check (defaults to WORKSPACE_ROOT)
-
-    Returns:
-        Ok(Workspace) if found, Err(WorkspaceError) if not found.
+    3. User-level remembered default workspace
     """
-    # Try environment variable first
+    # 1) Environment variable
     env_value = os.environ.get(env_var)
     if env_value:
         env_path = Path(env_value).expanduser().resolve()
         if env_path.is_dir() and is_workspace_root(env_path):
-            return Ok(Workspace(root=env_path))
-        # Environment variable set but invalid - this is an error, not a fallback
+            return Ok(WorkspaceInfo(workspace=Workspace(root=env_path), source="env"))
         return Err(
             WorkspaceError(
                 message=f"${env_var} is set to '{env_value}' but it is not a valid workspace",
@@ -191,18 +209,42 @@ def detect_workspace(
             )
         )
 
-    # Search upward from start directory
-    search_start = start_dir or Path.cwd()
-    search_start = search_start.resolve()
-
+    # 2) Search upward from start directory
+    search_start = (start_dir or Path.cwd()).resolve()
     found = find_workspace_upward(search_start)
     if found:
-        return Ok(Workspace(root=found))
+        return Ok(WorkspaceInfo(workspace=Workspace(root=found), source="cwd"))
+
+    # 3) Remembered default
+    remembered = get_default_workspace_root()
+    if isinstance(remembered, Err):
+        e = remembered.error
+        return Err(
+            WorkspaceError(
+                message=f"Could not load default workspace: {e.message}",
+                searched_from=e.path,
+            )
+        )
+
+    root = remembered.value
+    if root is None:
+        return Err(
+            WorkspaceError(
+                message="Could not find workspace (.ms-workspace not found)",
+                searched_from=search_start,
+            )
+        )
+
+    if root.is_dir() and is_workspace_root(root):
+        return Ok(WorkspaceInfo(workspace=Workspace(root=root), source="remembered"))
 
     return Err(
         WorkspaceError(
-            message="Could not find workspace (.ms-workspace not found)",
-            searched_from=search_start,
+            message=(
+                f"Default workspace configured in {user_workspace_config_path()} is set to '{root}' "
+                "but it is not a valid workspace"
+            ),
+            searched_from=root if root.is_dir() else None,
         )
     )
 

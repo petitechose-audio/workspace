@@ -9,14 +9,18 @@ from unittest.mock import patch
 import pytest
 
 from ms.core.result import Err, Ok
+from ms.core.user_workspace import remember_default_workspace_root
 from ms.core.workspace import (
     Workspace,
+    WorkspaceInfo,
     WorkspaceError,
     detect_workspace,
+    detect_workspace_info,
     detect_workspace_or_raise,
     find_workspace_upward,
     is_workspace_root,
 )
+from ms.platform.paths import clear_caches
 
 
 @pytest.fixture
@@ -246,6 +250,42 @@ class TestDetectWorkspace:
         with patch.dict(os.environ, {"WORKSPACE_ROOT": str(temp_workspace)}):
             result = detect_workspace()
             assert isinstance(result, Ok)
+
+    def test_remembered_workspace_used_when_not_found(self, tmp_path: Path) -> None:
+        """When cwd search fails, fall back to remembered default workspace."""
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        (ws / ".ms-workspace").write_text("")
+
+        # Redirect user config dir to tmp_path
+        env = {"APPDATA": str(tmp_path)} if os.name == "nt" else {"XDG_CONFIG_HOME": str(tmp_path)}
+        with patch.dict(os.environ, env, clear=False):
+            clear_caches()
+            assert isinstance(remember_default_workspace_root(ws), Ok)
+
+            start = tmp_path / "outside"
+            start.mkdir()
+            result = detect_workspace(start_dir=start)
+            assert isinstance(result, Ok)
+            assert result.value.root == ws
+
+    def test_detect_workspace_info_has_source(self, tmp_path: Path) -> None:
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        (ws / ".ms-workspace").write_text("")
+
+        env = {"APPDATA": str(tmp_path)} if os.name == "nt" else {"XDG_CONFIG_HOME": str(tmp_path)}
+        with patch.dict(os.environ, env, clear=False):
+            clear_caches()
+            assert isinstance(remember_default_workspace_root(ws), Ok)
+            start = tmp_path / "outside"
+            start.mkdir()
+
+            info = detect_workspace_info(start_dir=start)
+            assert isinstance(info, Ok)
+            assert isinstance(info.value, WorkspaceInfo)
+            assert info.value.workspace.root == ws
+            assert info.value.source == "remembered"
 
 
 class TestDetectWorkspaceOrRaise:
