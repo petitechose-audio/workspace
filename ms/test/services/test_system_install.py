@@ -35,11 +35,46 @@ def test_plan_parses_safe_installs_and_marks_manual() -> None:
     plan = installer.plan_installation(results)
 
     assert [s.argv for s in plan.steps] == [
-        ["sudo", "apt", "install", "libsdl2-dev"],
-        ["sudo", "apt", "install", "gh"],
+        ["sudo", "apt", "install", "libsdl2-dev", "gh"],
     ]
     assert ("uv", "curl -LsSf https://astral.sh/uv/install.sh | sh") in plan.manual
     assert ("gh auth", "Run: gh auth login") in plan.manual
+
+
+def test_plan_groups_packages_for_multi_package_installers() -> None:
+    console = MockConsole()
+    runner = RecordingRunner()
+    installer = SystemInstaller(console=console, runner=runner, confirm=lambda _msg: True)
+
+    results = [
+        CheckResult.error("pkg-config", "missing", hint="sudo apt install pkg-config"),
+        CheckResult.error("SDL2", "missing", hint="sudo apt install libsdl2-dev"),
+        CheckResult.error("pkg-config", "missing", hint="sudo apt install pkg-config"),
+    ]
+
+    plan = installer.plan_installation(results)
+
+    assert [s.argv for s in plan.steps] == [
+        ["sudo", "apt", "install", "pkg-config", "libsdl2-dev"],
+    ]
+
+
+def test_plan_keeps_brew_variants_separate() -> None:
+    console = MockConsole()
+    runner = RecordingRunner()
+    installer = SystemInstaller(console=console, runner=runner, confirm=lambda _msg: True)
+
+    results = [
+        CheckResult.error("inkscape", "missing", hint="brew install --cask inkscape"),
+        CheckResult.error("pkg-config", "missing", hint="brew install pkg-config"),
+    ]
+
+    plan = installer.plan_installation(results)
+
+    assert [s.argv for s in plan.steps] == [
+        ["brew", "install", "--cask", "inkscape"],
+        ["brew", "install", "pkg-config"],
+    ]
 
 
 def test_apply_dry_run_does_not_execute() -> None:

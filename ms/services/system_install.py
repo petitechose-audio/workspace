@@ -74,6 +74,109 @@ _SAFE_PREFIXES: tuple[tuple[str, ...], ...] = (
 _SAFE_EXACT: tuple[tuple[str, ...], ...] = (("xcode-select", "--install"),)
 
 
+@dataclass(slots=True)
+class _GroupedInstall:
+    key: tuple[str, ...]
+    prefix: tuple[str, ...]
+    manager: str
+    options: list[str]
+    packages: list[str]
+    names: list[str]
+
+
+def _split_install_argv(argv: list[str]) -> _GroupedInstall | None:
+    """Return a grouping descriptor for a safe install argv.
+
+    Only a subset of installers support multi-package installs.
+    """
+    if tuple(argv) in _SAFE_EXACT:
+        return None
+
+    def split(
+        prefix: tuple[str, ...], *, manager: str, key: tuple[str, ...] | None = None
+    ) -> _GroupedInstall:
+        rest = argv[len(prefix) :]
+        options: list[str] = []
+        packages: list[str] = []
+        for tok in rest:
+            if tok.startswith("-"):
+                if tok not in options:
+                    options.append(tok)
+            else:
+                if tok not in packages:
+                    packages.append(tok)
+        return _GroupedInstall(
+            key=key or prefix,
+            prefix=prefix,
+            manager=manager,
+            options=options,
+            packages=packages,
+            names=[],
+        )
+
+    if tuple(argv[:3]) == ("sudo", "apt", "install"):
+        return split(("sudo", "apt", "install"), manager="apt")
+    if tuple(argv[:3]) == ("sudo", "dnf", "install"):
+        return split(("sudo", "dnf", "install"), manager="dnf")
+    if tuple(argv[:3]) == ("sudo", "pacman", "-S"):
+        return split(("sudo", "pacman", "-S"), manager="pacman")
+    if tuple(argv[:2]) == ("brew", "install"):
+        # Keep brew variants separate (e.g. --cask).
+        rest = argv[2:]
+        opts = tuple(tok for tok in rest if tok.startswith("-"))
+        key = ("brew", "install", *opts)
+        return split(("brew", "install"), manager="brew", key=key)
+
+    # winget doesn't support multi-package install; keep as-is.
+    return None
+
+
+def _group_steps(steps: list[InstallStep]) -> list[InstallStep]:
+    grouped: dict[tuple[str, ...], _GroupedInstall] = {}
+    out: list[InstallStep | tuple[str, ...]] = []
+    seen_verbatim: set[tuple[str, ...]] = set()
+
+    for step in steps:
+        spec = _split_install_argv(step.argv)
+        if spec is None:
+            key = tuple(step.argv)
+            if key in seen_verbatim:
+                continue
+            seen_verbatim.add(key)
+            out.append(step)
+            continue
+
+        g = grouped.get(spec.key)
+        if g is None:
+            g = spec
+            grouped[spec.key] = g
+            out.append(spec.key)
+
+        if step.name not in g.names:
+            g.names.append(step.name)
+
+        for opt in spec.options:
+            if opt not in g.options:
+                g.options.append(opt)
+
+        for pkg in spec.packages:
+            if pkg not in g.packages:
+                g.packages.append(pkg)
+
+    result: list[InstallStep] = []
+    for item in out:
+        if isinstance(item, InstallStep):
+            result.append(item)
+            continue
+
+        g = grouped[item]
+        name = f"{g.manager}: {', '.join(g.names)}" if g.names else g.manager
+        argv = [*g.prefix, *g.options, *g.packages]
+        result.append(InstallStep(name=name, argv=argv))
+
+    return result
+
+
 def _is_manual_hint(hint: str) -> bool:
     stripped = hint.strip()
     return stripped.startswith(_MANUAL_PREFIXES)
@@ -134,7 +237,7 @@ class SystemInstaller:
             else:
                 steps.append(InstallStep(name=r.name, argv=argv))
 
-        return InstallPlan(steps=steps, manual=manual)
+        return InstallPlan(steps=_group_steps(steps), manual=manual)
 
     def apply(self, plan: InstallPlan, *, dry_run: bool, assume_yes: bool) -> bool:
         if plan.is_empty:
