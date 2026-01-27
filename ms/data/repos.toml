@@ -1,0 +1,101 @@
+# Pinned repository manifest for the workspace.
+#
+# Phase 3 goal: repo sync works with `git` only (no `gh`, no GH auth).
+# This file defines *which* repos exist and *where* they are cloned.
+#
+# Notes:
+# - We keep the set minimal but complete for dev (core + bitwig):
+#   - Teensy firmware builds use local open-control libs via PlatformIO symlinks.
+#   - SDL native/wasm builds use additional open-control HAL repos.
+#   - Bitwig protocol generation uses open-control/protocol-codegen.
+
+[[repos]]
+org = "open-control"
+name = "bridge"
+url = "https://github.com/open-control/bridge"
+path = "open-control/bridge"
+branch = "main"
+
+[[repos]]
+org = "open-control"
+name = "framework"
+url = "https://github.com/open-control/framework"
+path = "open-control/framework"
+branch = "main"
+
+[[repos]]
+org = "open-control"
+name = "hal-common"
+url = "https://github.com/open-control/hal-common"
+path = "open-control/hal-common"
+branch = "main"
+
+[[repos]]
+org = "open-control"
+name = "hal-midi"
+url = "https://github.com/open-control/hal-midi"
+path = "open-control/hal-midi"
+branch = "main"
+
+[[repos]]
+org = "open-control"
+name = "hal-net"
+url = "https://github.com/open-control/hal-net"
+path = "open-control/hal-net"
+branch = "main"
+
+[[repos]]
+org = "open-control"
+name = "hal-sdl"
+url = "https://github.com/open-control/hal-sdl"
+path = "open-control/hal-sdl"
+branch = "main"
+
+[[repos]]
+org = "open-control"
+name = "hal-teensy"
+url = "https://github.com/open-control/hal-teensy"
+path = "open-control/hal-teensy"
+branch = "main"
+
+[[repos]]
+org = "open-control"
+name = "protocol-codegen"
+url = "https://github.com/open-control/protocol-codegen"
+path = "open-control/protocol-codegen"
+branch = "main"
+
+[[repos]]
+org = "open-control"
+name = "ui-lvgl"
+url = "https://github.com/open-control/ui-lvgl"
+path = "open-control/ui-lvgl"
+branch = "main"
+
+[[repos]]
+org = "open-control"
+name = "ui-lvgl-cli-tools"
+url = "https://github.com/open-control/ui-lvgl-cli-tools"
+path = "open-control/ui-lvgl-cli-tools"
+branch = "main"
+
+[[repos]]
+org = "open-control"
+name = "ui-lvgl-components"
+url = "https://github.com/open-control/ui-lvgl-components"
+path = "open-control/ui-lvgl-components"
+branch = "main"
+
+[[repos]]
+org = "petitechose-midi-studio"
+name = "core"
+url = "https://github.com/petitechose-midi-studio/core"
+path = "midi-studio/core"
+branch = "main"
+
+[[repos]]
+org = "petitechose-midi-studio"
+name = "plugin-bitwig"
+url = "https://github.com/petitechose-midi-studio/plugin-bitwig"
+path = "midi-studio/plugin-bitwig"
+branch = "main"
