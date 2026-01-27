@@ -246,10 +246,15 @@ class ToolsChecker:
         platform_key = get_platform_key(self.platform, self.distro)
         hint = self.hints.get_tool_hint(tool_id, platform_key)
 
-        # Prefer `winget` for Git on Windows when available.
+        # Prefer `winget` for selected tools on Windows when available.
         if tool_id == "git" and platform_key == "windows":
             if shutil.which("winget"):
                 return "winget install --id Git.Git -e"
             return hint or "Install Git for Windows: https://git-scm.com/"
+
+        if tool_id == "uv" and platform_key == "windows":
+            if shutil.which("winget"):
+                return "winget install --id astral-sh.uv -e"
+            return hint or "Install uv: https://docs.astral.sh/uv/getting-started/installation/"
 
         return hint

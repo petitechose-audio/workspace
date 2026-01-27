@@ -38,11 +38,11 @@ macos = "Run: uv run ms tools sync"
 windows = "Run: uv run ms tools sync"
 
 [tools.uv]
-fedora = "curl -LsSf https://astral.sh/uv/install.sh | sh"
-debian = "curl -LsSf https://astral.sh/uv/install.sh | sh"
-arch = "curl -LsSf https://astral.sh/uv/install.sh | sh"
-macos = "curl -LsSf https://astral.sh/uv/install.sh | sh"
-windows = "powershell -c \"irm https://astral.sh/uv/install.ps1 | iex\""
+fedora = "Install uv: https://docs.astral.sh/uv/getting-started/installation/"
+debian = "Install uv: https://docs.astral.sh/uv/getting-started/installation/"
+arch = "Install uv: https://docs.astral.sh/uv/getting-started/installation/"
+macos = "brew install uv"
+windows = "Install uv: https://docs.astral.sh/uv/getting-started/installation/"
 
 # =============================================================================
 # Java Tools
@@ -74,31 +74,31 @@ macos = "xcode-select --install"
 windows = "Install Git for Windows: https://git-scm.com/"
 
 [tools.gh]
-fedora = "sudo dnf install gh"
-debian = "sudo apt install gh"
-arch = "sudo pacman -S github-cli"
+fedora = "sudo dnf install -y gh"
+debian = "sudo apt install -y gh"
+arch = "sudo pacman -S --noconfirm github-cli"
 macos = "brew install gh"
-windows = "winget install GitHub.cli"
+windows = "winget install --id GitHub.cli -e"
 
 [tools.cargo]
-fedora = "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-debian = "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-arch = "sudo pacman -S rust"
-macos = "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-windows = "Download from https://rustup.rs"
+fedora = "Install rustup: https://rustup.rs"
+debian = "Install rustup: https://rustup.rs"
+arch = "sudo pacman -S --noconfirm rust"
+macos = "Install rustup: https://rustup.rs"
+windows = "Install rustup: https://rustup.rs"
 
 [tools."g++"]
-fedora = "sudo dnf install gcc-c++"
-debian = "sudo apt install g++"
-arch = "sudo pacman -S gcc"
+fedora = "sudo dnf install -y gcc-c++"
+debian = "sudo apt install -y g++"
+arch = "sudo pacman -S --noconfirm gcc"
 macos = "xcode-select --install"
 windows = "Install MinGW-w64: https://www.mingw-w64.org/"
 
 # C compiler/linker - required for Rust compilation
 [system.cc]
-fedora = "sudo dnf install gcc"
-debian = "sudo apt install build-essential"
-arch = "sudo pacman -S base-devel"
+fedora = "sudo dnf install -y gcc"
+debian = "sudo apt install -y build-essential"
+arch = "sudo pacman -S --noconfirm base-devel"
 macos = "xcode-select --install"
 windows = "Install Build Tools: https://visualstudio.microsoft.com/visual-cpp-build-tools/"
 
@@ -125,31 +125,31 @@ windows = "Run: uv run ms tools sync"
 # =============================================================================
 
 [system.sdl2]
-fedora = "sudo dnf install SDL2-devel"
-debian = "sudo apt install libsdl2-dev"
-arch = "sudo pacman -S sdl2"
+fedora = "sudo dnf install -y SDL2-devel"
+debian = "sudo apt install -y libsdl2-dev"
+arch = "sudo pacman -S --noconfirm sdl2"
 macos = "brew install sdl2"
 windows = "Run: uv run ms tools sync"
 
 [system.alsa]
-fedora = "sudo dnf install alsa-lib-devel"
-debian = "sudo apt install libasound2-dev"
-arch = "sudo pacman -S alsa-lib"
+fedora = "sudo dnf install -y alsa-lib-devel"
+debian = "sudo apt install -y libasound2-dev"
+arch = "sudo pacman -S --noconfirm alsa-lib"
 macos = "N/A (uses CoreMIDI)"
 windows = "N/A (uses WinMM)"
 
 [system.pkg-config]
-fedora = "sudo dnf install pkgconf-pkg-config"
-debian = "sudo apt install pkg-config"
-arch = "sudo pacman -S pkgconf"
+fedora = "sudo dnf install -y pkgconf-pkg-config"
+debian = "sudo apt install -y pkg-config"
+arch = "sudo pacman -S --noconfirm pkgconf"
 macos = "brew install pkg-config"
 windows = "N/A"
 
 # libudev - required for USB/MIDI device access (oc-bridge)
 [system.libudev]
-fedora = "sudo dnf install systemd-devel"
-debian = "sudo apt install libudev-dev pkg-config"
-arch = "sudo pacman -S systemd-libs"
+fedora = "sudo dnf install -y systemd-devel"
+debian = "sudo apt install -y libudev-dev pkg-config"
+arch = "sudo pacman -S --noconfirm systemd-libs"
 macos = "N/A (uses IOKit)"
 windows = "N/A (uses WinUSB)"
 
@@ -158,16 +158,16 @@ windows = "N/A (uses WinUSB)"
 # =============================================================================
 
 [tools.inkscape]
-fedora = "sudo dnf install inkscape"
-debian = "sudo apt install inkscape"
-arch = "sudo pacman -S inkscape"
+fedora = "sudo dnf install -y inkscape"
+debian = "sudo apt install -y inkscape"
+arch = "sudo pacman -S --noconfirm inkscape"
 macos = "brew install --cask inkscape"
 windows = "https://inkscape.org/release/1.4.3/platforms/"
 
 [tools.fontforge]
-fedora = "sudo dnf install fontforge"
-debian = "sudo apt install fontforge"
-arch = "sudo pacman -S fontforge"
+fedora = "sudo dnf install -y fontforge"
+debian = "sudo apt install -y fontforge"
+arch = "sudo pacman -S --noconfirm fontforge"
 macos = "brew install --cask fontforge"
 windows = "https://fontforge.org/en-US/downloads/"
 
@@ -177,20 +177,20 @@ windows = "https://fontforge.org/en-US/downloads/"
 
 [runtime.virmidi]
 linux = "sudo modprobe snd-virmidi"
-linux_persistent = "echo 'snd-virmidi' | sudo tee /etc/modules-load.d/virmidi.conf"
+linux_persistent = "Create /etc/modules-load.d/virmidi.conf containing: snd-virmidi"
 
 [runtime.serial_permissions]
 linux_dialout = "sudo usermod -a -G dialout $USER"
 linux_uucp = "sudo usermod -a -G uucp $USER"
 
 [runtime.udev_teensy]
-linux = "curl -fsSL https://www.pjrc.com/teensy/00-teensy.rules | sudo tee /etc/udev/rules.d/00-teensy.rules >/dev/null"
+linux = "Download https://www.pjrc.com/teensy/00-teensy.rules to /etc/udev/rules.d/00-teensy.rules"
 
 [runtime.udev_platformio]
-linux = "curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core/develop/scripts/99-platformio-udev.rules | sudo tee /etc/udev/rules.d/99-platformio-udev.rules >/dev/null"
+linux = "Download https://raw.githubusercontent.com/platformio/platformio-core/develop/scripts/99-platformio-udev.rules to /etc/udev/rules.d/99-platformio-udev.rules"
 
 [runtime.udev_reload]
-linux = "sudo udevadm control --reload-rules && sudo udevadm trigger"
+linux = "Run: sudo udevadm control --reload-rules then sudo udevadm trigger"
 
 [runtime.midi]
 macos = "Enable IAC Driver in Audio MIDI Setup"
