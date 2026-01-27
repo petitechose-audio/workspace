@@ -3,11 +3,24 @@
 ## midi-studio
 
 ```bash
-# Alias définis dans shell
-ms core          # cd midi-studio/core && pio run
-ms bitwig        # cd midi-studio/plugin-bitwig && pio run
-ms run core      # Build + run native core
-ms run bitwig    # Build + run native bitwig
+# ms (CLI)
+uv run ms list
+
+# Native simulators
+uv run ms run core
+uv run ms run bitwig
+
+# Web (WASM) simulators
+uv run ms web core
+uv run ms web bitwig
+
+# Teensy firmware
+uv run ms build core --target teensy --dry-run
+uv run ms upload core --env dev
+uv run ms monitor core --env dev
+
+# Bitwig extension
+uv run ms build bitwig --target extension
 
 # Protocol generation
 cd midi-studio/plugin-bitwig

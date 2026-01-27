@@ -24,7 +24,7 @@
 
 3. `refactor(hardware): call python oc-* from ms`
    - Update `ms/services/hardware.py` to run `python -m ms.oc_cli.oc_*` (no bash)
-   - Add `--env` passthrough for hardware modes (`ms core`, `ms bitwig`)
+   - Add `--env` passthrough for hardware modes (`ms build|upload|monitor <app> ...`)
 
 4. `test(hardware): add command construction tests`
    - Tests that do not call real PlatformIO
@@ -44,7 +44,7 @@
 - 2026-01-27:
   - Ported oc-* (build/upload/monitor) to Python and exposed as `uv run oc-build|oc-upload|oc-monitor`.
   - Updated `ms` hardware workflows to run the Python oc-* modules (no bash).
-  - Added `--env` passthrough for hardware modes (`ms core`, `ms bitwig`).
+  - Added `--env` passthrough for hardware modes (`ms build|upload|monitor <app> ...`).
   - Removed `shell=True` from clipboard implementation.
   - Made network tests opt-in by default (pytest marker).
   - Verified: `uv run oc-build --help`, `uv run ms check`, `uv run pytest ms/test -q`.
@@ -76,8 +76,8 @@ uv run pytest -m network
 After commit 2 (hardware deshellized):
 
 ```bash
-uv run ms core --build --dry-run
-uv run ms bitwig --build --dry-run
+uv run ms build core --target teensy --dry-run
+uv run ms build bitwig --target teensy --dry-run
 ```
 
 ## Sources

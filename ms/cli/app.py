@@ -6,17 +6,21 @@ from pathlib import Path
 import typer
 
 from ms import __version__
-from ms.cli.commands.bitwig import bitwig
 from ms.cli.commands.bridge import bridge_app
+from ms.cli.commands.build_cmd import build
 from ms.cli.commands.check import check
 from ms.cli.commands.clean import clean
-from ms.cli.commands.core import core
+from ms.cli.commands.list_cmd import list_apps
+from ms.cli.commands.monitor_cmd import monitor
 from ms.cli.commands.prereqs import prereqs
+from ms.cli.commands.run_cmd import run
 from ms.cli.commands.setup import setup
 from ms.cli.commands.status import status
 from ms.cli.commands.sync import sync
 from ms.cli.commands.self_cmd import self_app
 from ms.cli.commands.tools import tools
+from ms.cli.commands.upload_cmd import upload
+from ms.cli.commands.web_cmd import web
 from ms.cli.commands.wipe import destroy, wipe
 from ms.cli.commands.workspace import forget, use, where
 from ms.core.errors import ErrorCode
@@ -31,6 +35,12 @@ app = typer.Typer(
 
 
 # Commands
+app.command("list")(list_apps)
+app.command()(build)
+app.command()(run)
+app.command()(web)
+app.command()(upload)
+app.command()(monitor)
 app.command()(check)
 app.command()(prereqs)
 app.command()(setup)
@@ -38,8 +48,6 @@ app.command()(sync)
 app.command()(tools)
 app.command()(status)
 app.command()(clean)
-app.command()(core)
-app.command()(bitwig)
 app.command()(use)
 app.command()(where)
 app.command()(forget)

@@ -1,7 +1,7 @@
 # Phase 6: CLI unified verbs
 
 **Scope**: ms CLI surface
-**Status**: planned
+**Status**: started
 **Created**: 2026-01-27
 **Updated**: 2026-01-27
 
@@ -9,22 +9,22 @@
 
 - Single coherent CLI surface (no app-specific mode puzzles).
 - Verbs are consistent across apps:
-  - `list`, `build`, `run`, `web`, `upload`, `monitor`, `bridge`, `bitwig`.
+  - `list`, `build`, `run`, `web`, `upload`, `monitor`, `bridge`.
 - All hints point to real commands.
 
 ## Planned commits (atomic)
 
 1. `refactor(cli): verb-based commands`
    - Add:
-     - `ms list`
-     - `ms build <app> --target native|wasm|teensy`
-     - `ms run <app>`
-     - `ms web <app> [--port]`
-     - `ms upload <app> [--env]`
-     - `ms monitor <app> [--env]`
+      - `ms list`
+      - `ms build <app> --target native|wasm|teensy|extension`
+      - `ms run <app>`
+      - `ms web <app> [--port]`
+      - `ms upload <app> [--env]`
+      - `ms monitor <app> [--env]`
 
 2. `refactor(cli): remove app-specific core/bitwig top-level commands`
-   - Remove or reduce `ms core` / `ms bitwig`.
+   - Remove `ms core` / `ms bitwig`.
 
 3. `fix(hints): remove phantom commands; align hints to real CLI`
 
@@ -32,9 +32,15 @@
 
 - 2026-01-27: Phase created (no code changes yet).
 
+- 2026-01-27:
+  - Added verb commands: `ms list`, `ms build`, `ms run`, `ms web`, `ms upload`, `ms monitor`.
+  - Bitwig extension is now handled via `ms build bitwig --target extension`.
+  - Removed legacy app-specific entrypoints: `ms core`, `ms bitwig`.
+
 ## Decisions
 
-- (pending)
+- No legacy aliases: only the verb-based commands are exposed.
+- Bitwig extension deploy is modeled as `ms build bitwig --target extension`.
 
 ## Plan deviations
 

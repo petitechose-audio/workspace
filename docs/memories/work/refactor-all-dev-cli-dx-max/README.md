@@ -91,7 +91,7 @@ Chaque commit doit:
 
 3. Commit: `refactor(hardware): call python oc-* from ms`
    - `ms/services/hardware.py` n'appelle plus bash; il lance `python -m ms.oc_cli.oc_*`.
-   - Ajouter `--env` passthrough sur `ms core` / `ms bitwig`.
+   - Ajouter `--env` passthrough sur `ms build|upload|monitor <app> ...`.
 
 4. Commit: `test(hardware): add command construction tests`
    - Tests sans appeler PlatformIO reel (commande/cwd/env).
@@ -181,14 +181,14 @@ Chaque commit doit:
 20. Commit: `refactor(cli): verb-based commands`
     - Ajouter/standardiser:
       - `ms list`
-      - `ms build <app> --target native|wasm|teensy`
+      - `ms build <app> --target native|wasm|teensy|extension`
       - `ms run <app>`
       - `ms web <app> [--port]`
       - `ms upload <app> [--env]`
       - `ms monitor <app> [--env]`
 
 21. Commit: `refactor(cli): remove app-specific core/bitwig top-level commands`
-    - Supprimer `ms core` / `ms bitwig` (ou les garder comme alias internes sans logique).
+    - Supprimer `ms core` / `ms bitwig` (pas d'alias, une seule surface CLI).
 
 22. Commit: `fix(hints): remove phantom commands; align hints to real CLI`
     - Remplacer partout `ms tools sync` / `ms repos sync` / `ms bridge install` fantomes.
@@ -210,7 +210,7 @@ Chaque commit doit:
 
 - Phase 1 done:
   - `ms` ne lance jamais `bash`.
-  - `ms core`/`ms bitwig` hardware path marche via PlatformIO (local).
+  - `ms build|upload|monitor <app>` hardware path marche via PlatformIO (local).
 
 - Phase 3 done:
   - aucune dependance a `gh`.

@@ -20,10 +20,17 @@
 - Phase 4 (bridge prebuilt): completed
 - Phase 5 (macos without brew): started
 - Phase 5a (type-safety contract): completed
-- Phase 6 (cli unified verbs): planned
+- Phase 6 (cli unified verbs): started
 - Phase 7 (ci matrix): planned
 
 ## Latest verification
+
+- 2026-01-27 (windows, phase-6):
+  - `uv run ms --help` ok (no legacy core/bitwig commands)
+  - `uv run ms list` ok
+  - `uv run ms build bitwig --target extension --dry-run` ok
+  - `pyright` -> 0 errors
+  - `uv run pytest ms/test -q` -> 918 passed, 7 skipped, 6 deselected
 
 - 2026-01-27 (windows, phase-5a):
   - `pyright` -> 0 errors
