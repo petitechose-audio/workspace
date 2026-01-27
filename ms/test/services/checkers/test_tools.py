@@ -224,9 +224,24 @@ class TestToolsCheckerCargo:
             distro=LinuxDistro.DEBIAN,
         )
         with patch("shutil.which", return_value=None):
-            result = checker.check_cargo()
+            result = checker.check_cargo(required=True)
 
         assert result.status == CheckStatus.ERROR
+        assert "curl ... rustup.rs" in (result.hint or "")
+
+    def test_cargo_not_found_optional(self, tmp_path: Path) -> None:
+        hints = Hints(tools={"cargo": {"debian": "curl ... rustup.rs"}})
+        checker = ToolsChecker(
+            platform=Platform.LINUX,
+            tools_dir=tmp_path / "tools",
+            hints=hints,
+            distro=LinuxDistro.DEBIAN,
+        )
+        with patch("shutil.which", return_value=None):
+            result = checker.check_cargo(required=False)
+
+        assert result.status == CheckStatus.WARNING
+        assert "optional" in result.message
         assert "curl ... rustup.rs" in (result.hint or "")
 
 
@@ -259,9 +274,24 @@ class TestToolsCheckerRustc:
             distro=LinuxDistro.DEBIAN,
         )
         with patch("shutil.which", return_value=None):
-            result = checker.check_rustc()
+            result = checker.check_rustc(required=True)
 
         assert result.status == CheckStatus.ERROR
+        assert "curl ... rustup.rs" in (result.hint or "")
+
+    def test_rustc_not_found_optional(self, tmp_path: Path) -> None:
+        hints = Hints(tools={"cargo": {"debian": "curl ... rustup.rs"}})
+        checker = ToolsChecker(
+            platform=Platform.LINUX,
+            tools_dir=tmp_path / "tools",
+            hints=hints,
+            distro=LinuxDistro.DEBIAN,
+        )
+        with patch("shutil.which", return_value=None):
+            result = checker.check_rustc(required=False)
+
+        assert result.status == CheckStatus.WARNING
+        assert "optional" in result.message
         assert "curl ... rustup.rs" in (result.hint or "")
 
 

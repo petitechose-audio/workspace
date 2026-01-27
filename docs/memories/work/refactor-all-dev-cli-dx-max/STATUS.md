@@ -17,12 +17,18 @@
 - Phase 1 (deshellize): started
 - Phase 2 (bootstrap prereqs): completed
 - Phase 3 (repos git-only): completed
-- Phase 4 (bridge prebuilt): planned
+- Phase 4 (bridge prebuilt): started
 - Phase 5 (macos without brew): planned
 - Phase 6 (cli unified verbs): planned
 - Phase 7 (ci matrix): planned
 
 ## Latest verification
+
+- 2026-01-27 (windows, phase-4):
+  - `uv run ms bridge --help` ok
+  - `uv run ms setup --dry-run` ok
+  - `uv run ms check` ok
+  - `uv run pytest ms/test -q` -> 917 passed, 7 skipped, 6 deselected
 
 - 2026-01-27 (windows):
   - `uv run ms --help` ok

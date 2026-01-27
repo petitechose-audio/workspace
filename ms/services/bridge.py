@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from ms.core.config import Config
 from ms.core.errors import ErrorCode
@@ -14,6 +14,11 @@ from ms.output.console import ConsoleProtocol, Style
 from ms.platform.detection import PlatformInfo
 from ms.platform.process import run, run_silent
 from ms.services.checkers.common import format_version_triplet, parse_version_triplet
+from ms.tools.download import Downloader
+from ms.tools.http import RealHttpClient
+
+if TYPE_CHECKING:
+    from ms.platform.detection import Arch, Platform
 
 # -----------------------------------------------------------------------------
 # Error Types
@@ -32,6 +37,8 @@ class BridgeError:
         "linker_missing",
         "build_failed",
         "binary_missing",
+        "download_failed",
+        "unsupported_platform",
     ]
     message: str
     hint: str | None = None
@@ -166,6 +173,70 @@ class BridgeService:
         self._console.success(str(dst))
         return Ok(dst)
 
+    def install_prebuilt(
+        self,
+        *,
+        version: str | None = None,
+        force: bool = False,
+        dry_run: bool = False,
+    ) -> Result[Path, BridgeError]:
+        """Install oc-bridge from GitHub releases.
+
+        This is the default installation path for end-users (no Rust required).
+        """
+        platform = self._platform.platform
+        arch = self._platform.arch
+
+        asset = _asset_name_for_platform(platform=platform, arch=arch)
+        if asset is None:
+            return Err(
+                BridgeError(
+                    kind="unsupported_platform",
+                    message=f"no prebuilt oc-bridge for {self._platform}",
+                    hint="Try: uv run ms bridge build (requires Rust)",
+                )
+            )
+
+        url = _release_asset_url(asset, version=version)
+        dst = self._installed_bridge_bin()
+
+        if dst.exists() and not force:
+            self._console.success(str(dst))
+            return Ok(dst)
+
+        self._console.print(f"download {url}", Style.DIM)
+        if dry_run:
+            self._console.print(f"would install bridge -> {dst}", Style.DIM)
+            return Ok(dst)
+
+        downloader = Downloader(RealHttpClient(), self._workspace.download_cache_dir)
+        downloaded = downloader.download(url, force=force)
+        if isinstance(downloaded, Err):
+            e = downloaded.error
+            return Err(
+                BridgeError(
+                    kind="download_failed",
+                    message=f"download failed: {e}",
+                    hint="Check your network, then retry."
+                    if version is None
+                    else "Check the version and asset name, then retry.",
+                )
+            )
+
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(downloaded.value.path, dst)
+        if self._platform.platform.is_unix:
+            dst.chmod(0o755)
+
+        # Best-effort: copy config presets next to the binary.
+        bridge_dir = self._bridge_dir()
+        src_config = bridge_dir / "config"
+        if src_config.is_dir():
+            shutil.copytree(src_config, dst.parent / "config", dirs_exist_ok=True)
+
+        self._console.success(str(dst))
+        return Ok(dst)
+
     def run(self, *, args: list[str]) -> int:
         exe = self._installed_bridge_bin()
         if not exe.exists():
@@ -175,7 +246,7 @@ class BridgeService:
 
         if not exe.exists():
             self._console.error(f"oc-bridge not found: {exe}")
-            self._console.print("hint: Run: uv run ms bridge build", Style.DIM)
+            self._console.print("hint: Run: uv run ms bridge install", Style.DIM)
             return int(ErrorCode.ENV_ERROR)
 
         cmd = [str(exe), *args]
@@ -186,6 +257,8 @@ class BridgeService:
                 return 0
             case Err(e):
                 return e.returncode
+            case _:
+                return int(ErrorCode.ENV_ERROR)
 
     def _bridge_dir(self) -> Path:
         rel = self._config.paths.bridge if self._config is not None else "open-control/bridge"
@@ -203,3 +276,31 @@ class BridgeService:
     def is_installed(self) -> bool:
         """Check if bridge binary is installed."""
         return self._installed_bridge_bin().exists()
+
+
+def _asset_name_for_platform(*, platform: "Platform", arch: "Arch") -> str | None:
+    from ms.platform.detection import Arch, Platform
+
+    match platform:
+        case Platform.WINDOWS:
+            return "oc-bridge-windows.exe" if arch == Arch.X64 else None
+        case Platform.LINUX:
+            return "oc-bridge-linux" if arch == Arch.X64 else None
+        case Platform.MACOS:
+            if arch == Arch.X64:
+                return "oc-bridge-macos-x64"
+            if arch == Arch.ARM64:
+                return "oc-bridge-macos-arm64"
+            return None
+        case _:
+            return None
+
+
+def _release_asset_url(asset: str, *, version: str | None) -> str:
+    if version is None:
+        return f"https://github.com/open-control/bridge/releases/latest/download/{asset}"
+    v = version.strip()
+    if not v:
+        return f"https://github.com/open-control/bridge/releases/latest/download/{asset}"
+    tag = v if v.startswith("v") else f"v{v}"
+    return f"https://github.com/open-control/bridge/releases/download/{tag}/{asset}"

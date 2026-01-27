@@ -1,6 +1,8 @@
-"""Bridge command - build and run oc-bridge."""
+"""Bridge commands - install/build/run oc-bridge."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import typer
 
@@ -11,30 +13,102 @@ from ms.output.console import Style
 from ms.services.bridge import BridgeService
 
 
+bridge_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=False,
+    rich_markup_mode="rich",
+)
+
+
+@bridge_app.callback(invoke_without_command=True)
 def bridge(
-    build: bool = typer.Option(False, "--build", help="Force rebuild"),
+    ctx: typer.Context,
+    build: bool = typer.Option(
+        False,
+        "--build",
+        help="Build oc-bridge from source (requires Rust)",
+    ),
 ) -> None:
-    """Run bridge (builds if needed)."""
-    ctx = build_context()
+    """Run bridge (installs if needed)."""
+    if ctx.invoked_subcommand is not None:
+        return
+
+    c = build_context()
     service = BridgeService(
-        workspace=ctx.workspace,
-        platform=ctx.platform,
-        config=ctx.config,
-        console=ctx.console,
+        workspace=c.workspace,
+        platform=c.platform,
+        config=c.config,
+        console=c.console,
     )
 
-    needs_build = build or not service.is_installed()
-
-    if needs_build:
+    if build:
         result = service.build()
-        match result:
-            case Err(e):
-                ctx.console.error(e.message)
-                if e.hint:
-                    ctx.console.print(f"hint: {e.hint}", Style.DIM)
-                raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))
-            case Ok(_):
-                pass
+    else:
+        result = service.install_prebuilt()
+
+    match result:
+        case Err(e):
+            c.console.error(e.message)
+            if e.hint:
+                c.console.print(f"hint: {e.hint}", Style.DIM)
+            raise typer.Exit(code=int(ErrorCode.ENV_ERROR))
+        case Ok(_):
+            pass
 
     code = service.run(args=[])
     raise typer.Exit(code=code)
+
+
+@bridge_app.command("install")
+def install(
+    version: str | None = typer.Option(
+        None,
+        "--version",
+        help="Install a specific release version (e.g. 0.1.1)",
+    ),
+    force: bool = typer.Option(False, "--force", help="Re-download even if installed"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done"),
+) -> None:
+    """Install oc-bridge from GitHub releases."""
+    c = build_context()
+    service = BridgeService(
+        workspace=c.workspace,
+        platform=c.platform,
+        config=c.config,
+        console=c.console,
+    )
+
+    result = service.install_prebuilt(version=version, force=force, dry_run=dry_run)
+    match result:
+        case Ok(_):
+            return
+        case Err(e):
+            c.console.error(e.message)
+            if e.hint:
+                c.console.print(f"hint: {e.hint}", Style.DIM)
+            raise typer.Exit(code=int(ErrorCode.ENV_ERROR))
+
+
+@bridge_app.command("build")
+def build_cmd(
+    debug: bool = typer.Option(False, "--debug", help="Build debug binary"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done"),
+) -> None:
+    """Build oc-bridge from source and install into bin/."""
+    c = build_context()
+    service = BridgeService(
+        workspace=c.workspace,
+        platform=c.platform,
+        config=c.config,
+        console=c.console,
+    )
+
+    result = service.build(release=not debug, dry_run=dry_run)
+    match result:
+        case Ok(_):
+            return
+        case Err(e):
+            c.console.error(e.message)
+            if e.hint:
+                c.console.print(f"hint: {e.hint}", Style.DIM)
+            raise typer.Exit(code=int(ErrorCode.BUILD_ERROR))

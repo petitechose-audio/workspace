@@ -7,7 +7,7 @@ import typer
 
 from ms import __version__
 from ms.cli.commands.bitwig import bitwig
-from ms.cli.commands.bridge import bridge
+from ms.cli.commands.bridge import bridge_app
 from ms.cli.commands.check import check
 from ms.cli.commands.clean import clean
 from ms.cli.commands.core import core
@@ -40,7 +40,6 @@ app.command()(status)
 app.command()(clean)
 app.command()(core)
 app.command()(bitwig)
-app.command()(bridge)
 app.command()(use)
 app.command()(where)
 app.command()(forget)
@@ -49,6 +48,7 @@ app.command()(destroy)
 
 # Sub-apps
 app.add_typer(self_app, name="self")
+app.add_typer(bridge_app, name="bridge")
 
 
 @app.callback()

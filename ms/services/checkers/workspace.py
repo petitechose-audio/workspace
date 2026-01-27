@@ -6,7 +6,7 @@ Validates that the workspace has:
 - midi-studio/ repository
 - config.toml (optional but recommended)
 - emsdk/ directory
-- oc-bridge binary (built)
+- oc-bridge binary (installed or built)
 - bitwig host directory
 """
 
@@ -105,7 +105,7 @@ class WorkspaceChecker:
         )
 
     def check_bridge(self) -> CheckResult:
-        """Check oc-bridge binary is built."""
+        """Check oc-bridge binary is installed or built."""
         bridge_dir = self._get_bridge_dir()
         exe_name = self._exe_name("oc-bridge")
         installed_bin = self.workspace.bin_dir / "bridge" / exe_name
@@ -117,8 +117,8 @@ class WorkspaceChecker:
             return CheckResult.success("oc-bridge", f"built ({bridge_bin})")
         return CheckResult.error(
             "oc-bridge",
-            "not built",
-            hint="Run: uv run ms bridge build",
+            "missing",
+            hint="Run: uv run ms bridge install",
         )
 
     def check_bitwig_host(self) -> CheckResult:

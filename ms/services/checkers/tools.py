@@ -57,8 +57,8 @@ class ToolsChecker:
         results.append(self.check_system_tool("git", ["--version"]))
         results.append(self.check_system_tool("gh", ["--version"], required=False))
         results.append(self.check_system_tool("uv", ["--version"]))
-        results.append(self.check_rustc())
-        results.append(self.check_cargo())
+        results.append(self.check_rustc(required=False))
+        results.append(self.check_cargo(required=False))
         results.append(self.check_gh_auth())
         results.append(self.check_python_deps())
 
@@ -129,33 +129,45 @@ class ToolsChecker:
             return CheckResult.error(name, "missing", hint=hint)
         return CheckResult.warning(name, "missing (optional)", hint=hint)
 
-    def check_rustc(self) -> CheckResult:
+    def check_rustc(self, *, required: bool = False) -> CheckResult:
         """Check rustc is installed and meets the minimum version."""
         if not shutil.which("rustc"):
             hint = self._rust_hint()
-            return CheckResult.error(
+            if required:
+                return CheckResult.error(
+                    "rustc",
+                    f"missing (>= {RUST_MIN_VERSION_TEXT} required)",
+                    hint=hint,
+                )
+            return CheckResult.warning(
                 "rustc",
-                f"missing (>= {RUST_MIN_VERSION_TEXT} required)",
+                "missing (optional)",
                 hint=hint,
             )
 
         version_line = self._get_version("rustc", ["--version"])
-        return self._check_min_version("rustc", version_line)
+        return self._check_min_version("rustc", version_line, required=required)
 
-    def check_cargo(self) -> CheckResult:
+    def check_cargo(self, *, required: bool = False) -> CheckResult:
         """Check cargo is installed and meets the minimum version."""
         if not shutil.which("cargo"):
             hint = self._rust_hint()
-            return CheckResult.error(
+            if required:
+                return CheckResult.error(
+                    "cargo",
+                    f"missing (>= {RUST_MIN_VERSION_TEXT} required)",
+                    hint=hint,
+                )
+            return CheckResult.warning(
                 "cargo",
-                f"missing (>= {RUST_MIN_VERSION_TEXT} required)",
+                "missing (optional)",
                 hint=hint,
             )
 
         version_line = self._get_version("cargo", ["--version"])
-        return self._check_min_version("cargo", version_line)
+        return self._check_min_version("cargo", version_line, required=required)
 
-    def _check_min_version(self, name: str, version_line: str) -> CheckResult:
+    def _check_min_version(self, name: str, version_line: str, *, required: bool) -> CheckResult:
         """Validate that a Rust tool meets the minimum version."""
         if not version_line:
             return CheckResult.success(name, "ok")
@@ -167,7 +179,13 @@ class ToolsChecker:
         if actual < RUST_MIN_VERSION:
             hint = self._rust_hint()
             found = format_version_triplet(actual)
-            return CheckResult.error(
+            if required:
+                return CheckResult.error(
+                    name,
+                    f"too old (found {found}, need >= {RUST_MIN_VERSION_TEXT})",
+                    hint=hint,
+                )
+            return CheckResult.warning(
                 name,
                 f"too old (found {found}, need >= {RUST_MIN_VERSION_TEXT})",
                 hint=hint,

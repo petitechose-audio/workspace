@@ -138,7 +138,7 @@ class SetupService:
             platform=self._platform,
             config=self._config,
             console=self._console,
-        ).build(dry_run=dry_run)
+        ).install_prebuilt(dry_run=dry_run)
         if isinstance(bridge_result, Err):
             return Err(
                 SetupError(

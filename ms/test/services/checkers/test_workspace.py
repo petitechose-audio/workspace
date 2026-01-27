@@ -107,7 +107,8 @@ class TestWorkspaceChecker:
         )
         result = checker.check_bridge()
         assert result.status == CheckStatus.ERROR
-        assert "not built" in result.message
+        assert "missing" in result.message
+        assert result.hint == "Run: uv run ms bridge install"
 
     def test_check_bridge_built(self, temp_workspace: Workspace) -> None:
         bridge_bin = temp_workspace.root / "open-control" / "bridge" / "target" / "release"

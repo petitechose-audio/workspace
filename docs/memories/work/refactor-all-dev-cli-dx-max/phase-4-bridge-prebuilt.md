@@ -1,7 +1,7 @@
 # Phase 4: Bridge prebuilt (no Rust prereq)
 
 **Scope**: bridge install/run + setup
-**Status**: planned
+**Status**: started
 **Created**: 2026-01-27
 **Updated**: 2026-01-27
 
@@ -29,18 +29,34 @@
 
 - 2026-01-27: Phase created (no code changes yet).
 
+- 2026-01-27:
+  - Upstream: `open-control/bridge` release workflow now publishes prebuilt assets (win/linux/macos x64+arm64), released `v0.1.1`.
+  - `ms setup` installs `oc-bridge` via GitHub releases (no Rust prereq).
+  - Rust/cargo removed from required prereqs; still checked as optional tools when present.
+  - `ms bridge` is now a subcommand group (`install` / `build`); default behavior installs prebuilt.
+  - Updated workspace checker + tests to report `oc-bridge` as `missing`/`installed` instead of only `built`.
+
 ## Decisions
 
-- (pending)
+- Install destination: `bin/bridge/oc-bridge(.exe)`.
+- Download source: `https://github.com/open-control/bridge/releases` (`latest` by default, optional pinned version).
+- Asset names:
+  - Windows x64: `oc-bridge-windows.exe`
+  - Linux x64: `oc-bridge-linux`
+  - macOS x64: `oc-bridge-macos-x64`
+  - macOS arm64: `oc-bridge-macos-arm64`
+- Keep build-from-source available via `ms bridge build` (Rust optional for contributors).
 
 ## Plan deviations
 
-- (none)
+- Workspace bridge check now considers both installed (`bin/bridge/...`) and built (`open-control/bridge/target/release/...`) binaries.
+- Bridge CLI refactored into a Typer sub-app (`ms bridge install|build`) instead of a single command.
 
 ## Verification (minimum)
 
 ```bash
 uv run pytest ms/test -q
+uv run ms bridge --help
 uv run ms setup --dry-run
 uv run ms check
 ```
@@ -52,5 +68,11 @@ Manual validation checklist:
 ## Sources
 
 - `ms/services/bridge.py`
+- `ms/services/setup.py`
+- `ms/services/prereqs.py`
+- `ms/services/checkers/tools.py`
+- `ms/services/checkers/workspace.py`
+- `ms/cli/commands/bridge.py`
+- `ms/cli/app.py`
 - `open-control/bridge/README.md`
 - `open-control/bridge/config/default.toml`
