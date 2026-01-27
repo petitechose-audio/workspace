@@ -61,3 +61,25 @@ def get_list(table: Mapping[str, object], key: str) -> ObjList | None:
     """Get a list from a mapping."""
     value = table.get(key)
     return as_obj_list(value)
+
+
+def get_int(table: Mapping[str, object], key: str) -> int | None:
+    """Get an integer value from a mapping.
+
+    Accepts an `int` directly. If a string is provided, it will be stripped and
+    parsed as base-10.
+    """
+    value = table.get(key)
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        try:
+            return int(s)
+        except ValueError:
+            return None
+    return None

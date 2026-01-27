@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from collections.abc import Mapping
 
 from .result import Err, Ok, Result
-from .structured import as_str_dict
+from .structured import StrDict, as_str_dict, get_int, get_str, get_table
 
 __all__ = [
     "Config",
@@ -129,66 +129,56 @@ class Config:
     bitwig: BitwigPathsConfig = field(default_factory=BitwigPathsConfig)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Config":
-        """Create Config from a dictionary (parsed TOML)."""
-        # Extract sections with proper typing
-        ports_data: dict[str, Any] = dict(data.get("ports", {}))
-        controller_data: dict[str, Any] = (
-            dict(ports_data.pop("controller", {})) if "controller" in ports_data else {}
-        )
-        midi_data: dict[str, Any] = data.get("midi", {})
-        paths_data: dict[str, Any] = data.get("paths", {})
-        bitwig_section: Any = data.get("bitwig", {})
-        bitwig_data: dict[str, Any] = {}
-        bitwig_table = as_str_dict(bitwig_section)
-        if bitwig_table is not None:
-            for k, v in bitwig_table.items():
-                bitwig_data[k] = v
+    def from_dict(cls, data: Mapping[str, object]) -> "Config":
+        """Create Config from a mapping (parsed TOML)."""
+        ports: StrDict = get_table(data, "ports") or {}
+        controller: StrDict = get_table(ports, "controller") or {}
+        midi: StrDict = get_table(data, "midi") or {}
+        paths: StrDict = get_table(data, "paths") or {}
+        bitwig: StrDict = get_table(data, "bitwig") or {}
 
         return cls(
             ports=PortsConfig(
-                hardware=int(ports_data.get("hardware", BRIDGE_HARDWARE_PORT)),
-                native=int(ports_data.get("native", BRIDGE_NATIVE_PORT)),
-                wasm=int(ports_data.get("wasm", BRIDGE_WASM_PORT)),
+                hardware=get_int(ports, "hardware") or BRIDGE_HARDWARE_PORT,
+                native=get_int(ports, "native") or BRIDGE_NATIVE_PORT,
+                wasm=get_int(ports, "wasm") or BRIDGE_WASM_PORT,
                 controller=ControllerPortsConfig(
-                    core_native=int(
-                        controller_data.get("core_native", CONTROLLER_CORE_NATIVE_PORT)
-                    ),
-                    core_wasm=int(controller_data.get("core_wasm", CONTROLLER_CORE_WASM_PORT)),
-                    bitwig_native=int(
-                        controller_data.get("bitwig_native", CONTROLLER_BITWIG_NATIVE_PORT)
-                    ),
-                    bitwig_wasm=int(
-                        controller_data.get("bitwig_wasm", CONTROLLER_BITWIG_WASM_PORT)
-                    ),
+                    core_native=get_int(controller, "core_native") or CONTROLLER_CORE_NATIVE_PORT,
+                    core_wasm=get_int(controller, "core_wasm") or CONTROLLER_CORE_WASM_PORT,
+                    bitwig_native=get_int(controller, "bitwig_native")
+                    or CONTROLLER_BITWIG_NATIVE_PORT,
+                    bitwig_wasm=get_int(controller, "bitwig_wasm") or CONTROLLER_BITWIG_WASM_PORT,
                 ),
             ),
             midi=MidiConfig(
-                linux=str(midi_data.get("linux", "VirMIDI")),
-                macos_input=str(midi_data.get("macos_input", "MIDI Studio IN")),
-                macos_output=str(midi_data.get("macos_output", "MIDI Studio OUT")),
-                windows=str(midi_data.get("windows", "loopMIDI")),
+                linux=get_str(midi, "linux") or "VirMIDI",
+                macos_input=get_str(midi, "macos_input") or "MIDI Studio IN",
+                macos_output=get_str(midi, "macos_output") or "MIDI Studio OUT",
+                windows=get_str(midi, "windows") or "loopMIDI",
             ),
             paths=PathsConfig(
-                bridge=str(paths_data.get("bridge", "open-control/bridge")),
-                extension=str(paths_data.get("extension", "midi-studio/plugin-bitwig/host")),
-                tools=str(paths_data.get("tools", "tools")),
+                bridge=get_str(paths, "bridge") or "open-control/bridge",
+                extension=get_str(paths, "extension") or "midi-studio/plugin-bitwig/host",
+                tools=get_str(paths, "tools") or "tools",
             ),
             bitwig=BitwigPathsConfig(
-                linux=str(bitwig_data["linux"]) if bitwig_data.get("linux") else None,
-                macos=str(bitwig_data["macos"]) if bitwig_data.get("macos") else None,
-                windows=str(bitwig_data["windows"]) if bitwig_data.get("windows") else None,
+                linux=get_str(bitwig, "linux"),
+                macos=get_str(bitwig, "macos"),
+                windows=get_str(bitwig, "windows"),
             ),
         )
 
 
-def _parse_toml(path: Path) -> Result[dict[str, Any], ConfigError]:
+def _parse_toml(path: Path) -> Result[StrDict, ConfigError]:
     """Parse a TOML file, handling import and parse errors."""
     import tomllib
 
     try:
         content = path.read_bytes()
-        data: dict[str, Any] = tomllib.loads(content.decode("utf-8"))
+        data_obj: object = tomllib.loads(content.decode("utf-8"))
+        data = as_str_dict(data_obj)
+        if data is None:
+            return Err(ConfigError("Config root must be a TOML table", path=path))
         return Ok(data)
     except FileNotFoundError:
         return Err(ConfigError(f"Config file not found: {path}", path=path))

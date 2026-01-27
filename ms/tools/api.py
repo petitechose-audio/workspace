@@ -50,8 +50,8 @@ def github_latest_release(http: HttpClient, repo: str) -> Result[str, HttpError]
         return result
 
     data = result.value
-    tag_name = data.get("tag_name")
-    if not isinstance(tag_name, str):
+    tag_name = get_str(data, "tag_name")
+    if not tag_name:
         return Err(HttpError(url=url, status=0, message="Missing tag_name in response"))
 
     # Strip 'v' prefix if present

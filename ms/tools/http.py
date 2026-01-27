@@ -14,10 +14,10 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ms.core.result import Err, Ok, Result
-from ms.core.structured import as_str_dict
+from ms.core.structured import StrDict, as_str_dict
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -58,7 +58,7 @@ class HttpClient(Protocol):
     avoiding real network calls in unit tests.
     """
 
-    def get_json(self, url: str) -> Result[dict[str, Any], HttpError]:
+    def get_json(self, url: str) -> Result[StrDict, HttpError]:
         """Fetch URL and parse as JSON.
 
         Args:
@@ -152,7 +152,7 @@ class RealHttpClient:
         except OSError as e:
             return Err(HttpError(url=url, status=0, message=str(e)))
 
-    def get_json(self, url: str) -> Result[dict[str, Any], HttpError]:
+    def get_json(self, url: str) -> Result[StrDict, HttpError]:
         """Fetch URL and parse as JSON."""
         result = self._request(url)
         if isinstance(result, Err):
@@ -163,8 +163,7 @@ class RealHttpClient:
             data = as_str_dict(data_obj)
             if data is None:
                 return Err(HttpError(url=url, status=0, message="Expected JSON object"))
-            # Values are dynamic; preserve as Any for callers.
-            return Ok(cast(dict[str, Any], data))
+            return Ok(data)
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
             return Err(HttpError(url=url, status=0, message=f"JSON parse error: {e}"))
 
@@ -240,12 +239,12 @@ class MockHttpClient:
     """
 
     def __init__(self) -> None:
-        self._json_responses: dict[str, dict[str, Any] | HttpError] = {}
+        self._json_responses: dict[str, StrDict | HttpError] = {}
         self._text_responses: dict[str, str | HttpError] = {}
         self._download_responses: dict[str, bytes | HttpError] = {}
         self.calls: list[tuple[str, str]] = []
 
-    def set_json(self, url: str, response: dict[str, Any] | HttpError) -> None:
+    def set_json(self, url: str, response: StrDict | HttpError) -> None:
         """Set JSON response for URL."""
         self._json_responses[url] = response
 
@@ -257,7 +256,7 @@ class MockHttpClient:
         """Set download content for URL."""
         self._download_responses[url] = response
 
-    def get_json(self, url: str) -> Result[dict[str, Any], HttpError]:
+    def get_json(self, url: str) -> Result[StrDict, HttpError]:
         """Get mocked JSON response."""
         self.calls.append(("get_json", url))
 

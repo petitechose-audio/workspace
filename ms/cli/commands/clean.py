@@ -6,7 +6,7 @@ import os
 import shutil
 import stat
 from pathlib import Path
-from typing import Any
+from collections.abc import Callable
 
 import typer
 from rich.console import Console
@@ -16,7 +16,7 @@ from ms.cli.context import build_context
 _console = Console()
 
 
-def _remove_readonly(_func: Any, path: str, exc: BaseException) -> None:
+def _remove_readonly(_func: Callable[[str], object], path: str, exc: BaseException) -> None:
     """Handle read-only files on Windows (e.g. .git/objects/pack/*.idx)."""
     if isinstance(exc, PermissionError):
         os.chmod(path, stat.S_IWRITE)
@@ -29,11 +29,7 @@ def _find_pio_dirs(parent: Path) -> list[Path]:
     """Find all .pio directories in immediate subdirectories of parent."""
     if not parent.exists():
         return []
-    return [
-        d / ".pio"
-        for d in parent.iterdir()
-        if d.is_dir() and (d / ".pio").exists()
-    ]
+    return [d / ".pio" for d in parent.iterdir() if d.is_dir() and (d / ".pio").exists()]
 
 
 def clean(

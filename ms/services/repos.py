@@ -4,7 +4,7 @@ import json
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal, TypedDict
 
 from ms.core.result import Err, Ok, Result
 from ms.core.structured import as_obj_list, as_str_dict, get_str
@@ -42,6 +42,14 @@ class RepoSpec:
 
 @dataclass(frozen=True, slots=True)
 class RepoLockEntry:
+    org: str
+    name: str
+    url: str
+    default_branch: str | None
+    head_sha: str | None
+
+
+class _RepoLockPayload(TypedDict):
     org: str
     name: str
     url: str
@@ -302,7 +310,7 @@ class RepoService:
     def _write_lock(self, lock: list[RepoLockEntry]) -> None:
         self._workspace.state_dir.mkdir(parents=True, exist_ok=True)
         path = self._workspace.state_dir / "repos.lock.json"
-        payload: list[dict[str, Any]] = [
+        payload: list[_RepoLockPayload] = [
             {
                 "org": e.org,
                 "name": e.name,

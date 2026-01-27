@@ -9,7 +9,7 @@ import os
 import shutil
 import stat
 from pathlib import Path
-from typing import Any
+from collections.abc import Callable
 
 import typer
 from rich.console import Console
@@ -19,7 +19,7 @@ from ms.cli.context import build_context
 _console = Console()
 
 
-def _remove_readonly(_func: Any, path: str, exc: BaseException) -> None:
+def _remove_readonly(_func: Callable[[str], object], path: str, exc: BaseException) -> None:
     if isinstance(exc, PermissionError):
         os.chmod(path, stat.S_IWRITE)
         os.unlink(path)

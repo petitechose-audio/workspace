@@ -18,10 +18,11 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from ms.core.result import Err, Ok, Result
 from ms.platform.paths import user_config_dir
+
+from .structured import StrDict, as_str_dict
 
 __all__ = [
     "UserWorkspaceError",
@@ -42,7 +43,7 @@ def user_workspace_config_path() -> Path:
     return user_config_dir() / "workspace.toml"
 
 
-def _parse_toml(path: Path) -> Result[dict[str, Any], UserWorkspaceError]:
+def _parse_toml(path: Path) -> Result[StrDict, UserWorkspaceError]:
     try:
         raw = path.read_bytes()
     except FileNotFoundError:
@@ -53,7 +54,7 @@ def _parse_toml(path: Path) -> Result[dict[str, Any], UserWorkspaceError]:
         return Err(UserWorkspaceError(f"Error reading {path}: {e}", path=path))
 
     try:
-        data = tomllib.loads(raw.decode("utf-8"))
+        data_obj: object = tomllib.loads(raw.decode("utf-8"))
     except tomllib.TOMLDecodeError as e:
         return Err(UserWorkspaceError(f"Invalid TOML syntax: {e}", path=path))
     except UnicodeDecodeError as e:
@@ -61,7 +62,9 @@ def _parse_toml(path: Path) -> Result[dict[str, Any], UserWorkspaceError]:
     except Exception as e:  # noqa: BLE001
         return Err(UserWorkspaceError(f"Error parsing config: {e}", path=path))
 
-    # tomllib guarantees the top-level is a mapping.
+    data = as_str_dict(data_obj)
+    if data is None:
+        return Err(UserWorkspaceError("Config is not a TOML table", path=path))
     return Ok(data)
 
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Any
+from collections.abc import Callable
 from unittest.mock import patch
 
 import pytest
@@ -38,7 +38,7 @@ class MockCommandRunner:
         raise FileNotFoundError(f"Command not found: {args[0]}")
 
 
-def _which_factory(available: dict[str, str]) -> Any:
+def _which_factory(available: dict[str, str]) -> Callable[[str], str | None]:
     """Create a which mock that returns paths for available commands."""
 
     def mock_which(name: str) -> str | None:

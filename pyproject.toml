@@ -40,6 +40,9 @@ markers = [
 include = ["ms"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
+strictListInference = true
+strictDictionaryInference = true
+strictSetInference = true
 venvPath = "."
 venv = ".venv"
 

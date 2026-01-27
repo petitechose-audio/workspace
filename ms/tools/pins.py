@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from ms.core.structured import as_str_dict, get_str
 
@@ -36,7 +35,11 @@ class ToolPins:
         import tomllib
 
         with path.open("rb") as f:
-            data: dict[str, Any] = tomllib.load(f)
+            data_obj: object = tomllib.load(f)
+
+        data = as_str_dict(data_obj)
+        if data is None:
+            raise ValueError("Invalid toolchains.toml (expected a TOML table)")
 
         versions: dict[str, str] = {}
         tools = data.get("tools")
