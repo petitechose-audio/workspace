@@ -82,6 +82,13 @@
 - 2026-01-27:
   - Added `ms wipe` (generated artifacts) and `ms destroy` (delete workspace) with dry-run-by-default safety.
 
+- 2026-01-27:
+  - Refined `git` gating: required only for repo sync or git-based tool installs (emsdk clone).
+  - Improved Git install hints:
+    - Windows: prefer `winget install --id Git.Git -e` when available.
+    - Ubuntu/Fedora: `sudo apt/dnf install -y git`.
+  - Grouped and de-duplicated safe install steps per package manager (apt/dnf/pacman/brew).
+
 ## Decisions
 
 - Store the default workspace root in a dedicated user config file: `<user_config_dir>/workspace.toml`.

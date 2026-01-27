@@ -33,7 +33,9 @@
   - `uv run oc-upload --help` ok
   - `uv run oc-monitor --help` ok
   - `uv run ms setup --dry-run --install-cli --update-shell --remember-workspace` ok
-  - `uv run pytest ms/test -q` -> 909 passed, 7 skipped, 6 deselected (network)
+  - `uv run ms prereqs --help` ok
+  - `uv run ms prereqs --dry-run` ok
+  - `uv run pytest ms/test -q` -> 911 passed, 7 skipped, 6 deselected (network)
 
 ## Notes
 
