@@ -17,6 +17,7 @@ from ms.cli.commands.status import status
 from ms.cli.commands.sync import sync
 from ms.cli.commands.self_cmd import self_app
 from ms.cli.commands.tools import tools
+from ms.cli.commands.wipe import destroy, wipe
 from ms.cli.commands.workspace import forget, use, where
 from ms.core.errors import ErrorCode
 from ms.core.workspace import is_workspace_root
@@ -43,6 +44,8 @@ app.command()(bridge)
 app.command()(use)
 app.command()(where)
 app.command()(forget)
+app.command()(wipe)
+app.command()(destroy)
 
 # Sub-apps
 app.add_typer(self_app, name="self")

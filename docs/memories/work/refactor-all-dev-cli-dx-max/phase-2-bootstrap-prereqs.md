@@ -79,6 +79,9 @@
 - 2026-01-27:
   - Added `ms setup` flags: `--install-cli`, `--update-shell`, `--remember-workspace`.
 
+- 2026-01-27:
+  - Added `ms wipe` (generated artifacts) and `ms destroy` (delete workspace) with dry-run-by-default safety.
+
 ## Decisions
 
 - Store the default workspace root in a dedicated user config file: `<user_config_dir>/workspace.toml`.
@@ -130,4 +133,5 @@ uv run pytest -m network
 - `ms/cli/app.py`
 - `ms/cli/commands/self_cmd.py`
 - `ms/cli/commands/setup.py`
+- `ms/cli/commands/wipe.py`
 - `ms/data/hints.toml`
