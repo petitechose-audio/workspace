@@ -1,7 +1,7 @@
 # Phase 4: Bridge prebuilt (no Rust prereq)
 
 **Scope**: bridge install/run + setup
-**Status**: started
+**Status**: completed
 **Created**: 2026-01-27
 **Updated**: 2026-01-27
 
@@ -35,6 +35,7 @@
   - Rust/cargo removed from required prereqs; still checked as optional tools when present.
   - `ms bridge` is now a subcommand group (`install` / `build`); default behavior installs prebuilt.
   - Updated workspace checker + tests to report `oc-bridge` as `missing`/`installed` instead of only `built`.
+  - Verified (simulated no Rust in PATH): `ms setup --dry-run` ok; `ms check` shows rustc/cargo as optional warnings.
 
 ## Decisions
 
