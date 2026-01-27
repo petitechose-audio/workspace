@@ -1,7 +1,7 @@
 # Phase 7: CI matrix (multi-platform validation)
 
 **Scope**: CI + smoke tests
-**Status**: planned
+**Status**: started
 **Created**: 2026-01-27
 **Updated**: 2026-01-27
 
@@ -31,13 +31,19 @@
 
 - 2026-01-27: Phase created (no CI changes yet).
 
+- 2026-01-27:
+  - Added GitHub Actions workflow running a cross-platform smoke matrix.
+  - Validates: `uv sync --frozen --extra dev`, `uv run pyright`, `uv run pytest ms/test -q`.
+  - Runs safe CLI smoke in dry-run mode (`ms setup --dry-run`, `ms sync --tools --dry-run`, `ms sync --repos --dry-run`).
+  - Runs `ms check` as informational (non-blocking) because full workspace repos/toolchains are not present in CI by default.
+
 ## Decisions
 
-- (pending)
+- Keep CI fast: validate ms package (tests + typing) on all OS targets; don't auto-install heavy toolchains (emsdk) in the smoke job.
 
 ## Plan deviations
 
-- (none)
+- In CI, `ms check` is informational for now (non-blocking) because the workspace repos (`open-control/`, `midi-studio/`) are external clones and full toolchain installs (notably emsdk) are too heavy for the basic smoke matrix.
 
 ## Verification (minimum)
 
@@ -45,4 +51,4 @@
 
 ## Sources
 
-- `.github/workflows/*` (to be added)
+- `.github/workflows/ci.yml`

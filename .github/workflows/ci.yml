@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Sync Python deps
+        run: uv sync --frozen --extra dev
+
+      - name: Type check
+        run: uv run pyright
+
+      - name: Unit tests
+        run: uv run pytest ms/test -q
+
+      - name: CLI help
+        run: uv run ms --help
+
+      - name: Setup (dry-run)
+        run: uv run ms setup --dry-run
+
+      - name: Sync tools (dry-run)
+        run: uv run ms sync --tools --dry-run
+
+      - name: Sync repos (dry-run)
+        run: uv run ms sync --repos --dry-run
+
+      - name: Check (informational)
+        continue-on-error: true
+        run: uv run ms check
+
+  test_fedora:
+    name: test (fedora)
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:41
+    steps:
+      - name: Install system dependencies
+        run: |
+          dnf install -y curl git python3
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Sync Python deps
+        run: uv sync --frozen --extra dev
+
+      - name: Type check
+        run: uv run pyright
+
+      - name: Unit tests
+        run: uv run pytest ms/test -q
+
+      - name: CLI help
+        run: uv run ms --help
+
+      - name: Setup (dry-run)
+        run: uv run ms setup --dry-run
+
+      - name: Sync tools (dry-run)
+        run: uv run ms sync --tools --dry-run
+
+      - name: Sync repos (dry-run)
+        run: uv run ms sync --repos --dry-run
+
+      - name: Check (informational)
+        continue-on-error: true
+        run: uv run ms check
