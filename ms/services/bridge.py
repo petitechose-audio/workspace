@@ -8,10 +8,12 @@ from typing import Literal
 from ms.core.config import Config
 from ms.core.errors import ErrorCode
 from ms.core.result import Err, Ok, Result
+from ms.core.versions import RUST_MIN_VERSION, RUST_MIN_VERSION_TEXT
 from ms.core.workspace import Workspace
 from ms.output.console import ConsoleProtocol, Style
 from ms.platform.detection import PlatformInfo
-from ms.platform.process import run_silent
+from ms.platform.process import run, run_silent
+from ms.services.checkers.common import format_version_triplet, parse_version_triplet
 
 # -----------------------------------------------------------------------------
 # Error Types
@@ -22,7 +24,15 @@ from ms.platform.process import run_silent
 class BridgeError:
     """Error from bridge operations."""
 
-    kind: Literal["dir_missing", "cargo_missing", "linker_missing", "build_failed", "binary_missing"]
+    kind: Literal[
+        "dir_missing",
+        "cargo_missing",
+        "rustc_missing",
+        "rust_too_old",
+        "linker_missing",
+        "build_failed",
+        "binary_missing",
+    ]
     message: str
     hint: str | None = None
 
@@ -63,9 +73,7 @@ class BridgeService:
         self._config = config
         self._console = console
 
-    def build(
-        self, *, release: bool = True, dry_run: bool = False
-    ) -> Result[Path, BridgeError]:
+    def build(self, *, release: bool = True, dry_run: bool = False) -> Result[Path, BridgeError]:
         bridge_dir = self._bridge_dir()
         if not bridge_dir.is_dir():
             return Err(
@@ -85,6 +93,32 @@ class BridgeService:
                 )
             )
 
+        if shutil.which("rustc") is None:
+            return Err(
+                BridgeError(
+                    kind="rustc_missing",
+                    message=f"rustc: missing (>= {RUST_MIN_VERSION_TEXT} required)",
+                    hint="Install rustup: https://rustup.rs",
+                )
+            )
+
+        rustc_version = run(["rustc", "--version"], cwd=bridge_dir)
+        match rustc_version:
+            case Ok(stdout):
+                parsed = parse_version_triplet(stdout)
+                if parsed is not None and parsed < RUST_MIN_VERSION:
+                    found = format_version_triplet(parsed)
+                    return Err(
+                        BridgeError(
+                            kind="rust_too_old",
+                            message=f"rustc too old (found {found}, need >= {RUST_MIN_VERSION_TEXT})",
+                            hint="Install rustup: https://rustup.rs",
+                        )
+                    )
+            case Err(_):
+                # If we can't read the version, proceed and let cargo report errors.
+                pass
+
         # Rust needs a C linker (cc/gcc) to link binaries
         if not _has_c_linker():
             return Err(
@@ -95,7 +129,7 @@ class BridgeService:
                 )
             )
 
-        cmd = ["cargo", "build"]
+        cmd = ["cargo", "build", "--locked"]
         if release:
             cmd.append("--release")
 
@@ -107,9 +141,7 @@ class BridgeService:
 
         result = run_silent(cmd, cwd=bridge_dir)
         if isinstance(result, Err):
-            return Err(
-                BridgeError(kind="build_failed", message="bridge build failed")
-            )
+            return Err(BridgeError(kind="build_failed", message="bridge build failed"))
 
         built = self._built_bridge_bin(bridge_dir, release=release)
         if not built.exists():

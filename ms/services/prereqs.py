@@ -152,6 +152,15 @@ class PrereqsService:
             distro=self._platform.distro,
         )
 
+        # Rust toolchain is required (oc-bridge).
+        rustc = tools_checker.check_rustc()
+        if rustc.status != CheckStatus.OK:
+            issues.append(rustc)
+
+        cargo = tools_checker.check_cargo()
+        if cargo.status != CheckStatus.OK:
+            issues.append(cargo)
+
         if require_uv:
             uv = tools_checker.check_system_tool("uv", ["--version"])
             if uv.status != CheckStatus.OK:

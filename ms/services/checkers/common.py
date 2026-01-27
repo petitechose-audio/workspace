@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import subprocess
 import tomllib
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -219,6 +220,30 @@ def first_line(text: str) -> str:
     return ""
 
 
+_VERSION_TRIPLET_RE = re.compile(r"\b(\d+)\.(\d+)\.(\d+)\b")
+
+
+def parse_version_triplet(text: str) -> tuple[int, int, int] | None:
+    """Parse a SemVer-like X.Y.Z triplet from text.
+
+    Returns None if no triplet is found.
+    """
+    match = _VERSION_TRIPLET_RE.search(text)
+    if not match:
+        return None
+    major, minor, patch = match.groups()
+    try:
+        return (int(major), int(minor), int(patch))
+    except ValueError:
+        return None
+
+
+def format_version_triplet(version: tuple[int, int, int]) -> str:
+    """Format X.Y.Z from a version triplet."""
+    major, minor, patch = version
+    return f"{major}.{minor}.{patch}"
+
+
 # Import types for type hints only
 if True:  # TYPE_CHECKING workaround for runtime imports
     from ms.platform.detection import LinuxDistro, Platform
@@ -230,6 +255,8 @@ if True:  # TYPE_CHECKING workaround for runtime imports
         "load_hints",
         "get_platform_key",
         "first_line",
+        "parse_version_triplet",
+        "format_version_triplet",
         "Platform",
         "LinuxDistro",
     ]

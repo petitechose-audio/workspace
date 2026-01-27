@@ -201,7 +201,7 @@ class TestToolsCheckerCargo:
     def test_cargo_found(self, tmp_path: Path) -> None:
         runner = MockCommandRunner(
             {
-                ("cargo", "--version"): (0, "cargo 1.75.0 (1d8b05cdd 2023-11-20)", ""),
+                ("cargo", "--version"): (0, "cargo 1.93.0 (083ac5135 2025-12-15)", ""),
             }
         )
         checker = ToolsChecker(
@@ -213,7 +213,7 @@ class TestToolsCheckerCargo:
             result = checker.check_cargo()
 
         assert result.status == CheckStatus.OK
-        assert "cargo 1.75.0" in result.message
+        assert "cargo 1.93.0" in result.message
 
     def test_cargo_not_found(self, tmp_path: Path) -> None:
         hints = Hints(tools={"cargo": {"debian": "curl ... rustup.rs"}})
@@ -226,7 +226,42 @@ class TestToolsCheckerCargo:
         with patch("shutil.which", return_value=None):
             result = checker.check_cargo()
 
-        assert result.status == CheckStatus.WARNING
+        assert result.status == CheckStatus.ERROR
+        assert "curl ... rustup.rs" in (result.hint or "")
+
+
+class TestToolsCheckerRustc:
+    """Tests for check_rustc method."""
+
+    def test_rustc_found(self, tmp_path: Path) -> None:
+        runner = MockCommandRunner(
+            {
+                ("rustc", "--version"): (0, "rustc 1.93.0 (254b59607 2026-01-19)", ""),
+            }
+        )
+        checker = ToolsChecker(
+            platform=Platform.LINUX,
+            tools_dir=tmp_path / "tools",
+            runner=runner,
+        )
+        with patch("shutil.which", return_value="/home/user/.cargo/bin/rustc"):
+            result = checker.check_rustc()
+
+        assert result.status == CheckStatus.OK
+        assert "rustc 1.93.0" in result.message
+
+    def test_rustc_not_found(self, tmp_path: Path) -> None:
+        hints = Hints(tools={"cargo": {"debian": "curl ... rustup.rs"}})
+        checker = ToolsChecker(
+            platform=Platform.LINUX,
+            tools_dir=tmp_path / "tools",
+            hints=hints,
+            distro=LinuxDistro.DEBIAN,
+        )
+        with patch("shutil.which", return_value=None):
+            result = checker.check_rustc()
+
+        assert result.status == CheckStatus.ERROR
         assert "curl ... rustup.rs" in (result.hint or "")
 
 

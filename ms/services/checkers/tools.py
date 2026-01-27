@@ -2,7 +2,7 @@
 """Tools checker.
 
 Validates that required build tools are installed:
-- System tools: git, gh, uv, cargo
+- System tools: git, gh, uv, rustc, cargo
 - Bundled tools: cmake, ninja, bun, jdk, maven, platformio
 """
 
@@ -19,8 +19,12 @@ from ms.services.checkers.common import (
     DefaultCommandRunner,
     Hints,
     first_line,
+    format_version_triplet,
     get_platform_key,
+    parse_version_triplet,
 )
+
+from ms.core.versions import RUST_MIN_VERSION, RUST_MIN_VERSION_TEXT
 
 if TYPE_CHECKING:
     from ms.platform.detection import LinuxDistro, Platform
@@ -53,6 +57,8 @@ class ToolsChecker:
         results.append(self.check_system_tool("git", ["--version"]))
         results.append(self.check_system_tool("gh", ["--version"], required=False))
         results.append(self.check_system_tool("uv", ["--version"]))
+        results.append(self.check_rustc())
+        results.append(self.check_cargo())
         results.append(self.check_gh_auth())
         results.append(self.check_python_deps())
 
@@ -72,9 +78,6 @@ class ToolsChecker:
         results.append(self.check_bundled_tool(JdkTool(), ["-version"]))
         results.append(self.check_bundled_tool(MavenTool(), ["-version"]))
         results.append(self.check_bundled_tool(PlatformioTool(), ["--version"]))
-
-        # Cargo is system-only
-        results.append(self.check_cargo())
 
         return results
 
@@ -126,16 +129,55 @@ class ToolsChecker:
             return CheckResult.error(name, "missing", hint=hint)
         return CheckResult.warning(name, "missing (optional)", hint=hint)
 
-    def check_cargo(self) -> CheckResult:
-        """Check cargo (Rust) is installed."""
-        path = shutil.which("cargo")
-        if not path:
-            hint = self._get_tool_hint("cargo")
-            return CheckResult.warning("cargo", "missing", hint=hint)
+    def check_rustc(self) -> CheckResult:
+        """Check rustc is installed and meets the minimum version."""
+        if not shutil.which("rustc"):
+            hint = self._rust_hint()
+            return CheckResult.error(
+                "rustc",
+                f"missing (>= {RUST_MIN_VERSION_TEXT} required)",
+                hint=hint,
+            )
 
-        version = self._get_version("cargo", ["--version"])
-        msg = version if version else "ok"
-        return CheckResult.success("cargo", msg)
+        version_line = self._get_version("rustc", ["--version"])
+        return self._check_min_version("rustc", version_line)
+
+    def check_cargo(self) -> CheckResult:
+        """Check cargo is installed and meets the minimum version."""
+        if not shutil.which("cargo"):
+            hint = self._rust_hint()
+            return CheckResult.error(
+                "cargo",
+                f"missing (>= {RUST_MIN_VERSION_TEXT} required)",
+                hint=hint,
+            )
+
+        version_line = self._get_version("cargo", ["--version"])
+        return self._check_min_version("cargo", version_line)
+
+    def _check_min_version(self, name: str, version_line: str) -> CheckResult:
+        """Validate that a Rust tool meets the minimum version."""
+        if not version_line:
+            return CheckResult.success(name, "ok")
+
+        actual = parse_version_triplet(version_line)
+        if actual is None:
+            return CheckResult.success(name, version_line)
+
+        if actual < RUST_MIN_VERSION:
+            hint = self._rust_hint()
+            found = format_version_triplet(actual)
+            return CheckResult.error(
+                name,
+                f"too old (found {found}, need >= {RUST_MIN_VERSION_TEXT})",
+                hint=hint,
+            )
+
+        return CheckResult.success(name, version_line)
+
+    def _rust_hint(self) -> str:
+        hint = self._get_tool_hint("cargo")
+        return hint or "Install rustup: https://rustup.rs"
 
     def check_gh_auth(self) -> CheckResult:
         """Check GitHub CLI authentication status."""

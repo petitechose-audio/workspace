@@ -115,7 +115,7 @@ class WorkspaceChecker:
         bridge_bin = bridge_dir / "target" / "release" / exe_name
         if bridge_bin.exists():
             return CheckResult.success("oc-bridge", f"built ({bridge_bin})")
-        return CheckResult.warning(
+        return CheckResult.error(
             "oc-bridge",
             "not built",
             hint="Run: uv run ms bridge build",

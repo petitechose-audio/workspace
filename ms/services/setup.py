@@ -11,6 +11,7 @@ from ms.output.console import ConsoleProtocol, Style
 from ms.platform.detection import PlatformInfo
 from ms.platform.process import run_silent
 from ms.services.check import CheckService
+from ms.services.bridge import BridgeService
 from ms.services.repos import RepoService
 from ms.services.prereqs import PrereqsService
 from ms.services.toolchains import ToolchainService
@@ -27,6 +28,7 @@ class SetupError:
 
     kind: Literal[
         "mode_unsupported",
+        "bridge_failed",
         "repos_failed",
         "tools_failed",
         "python_failed",
@@ -122,6 +124,23 @@ class SetupService:
                         message=result.error.message,
                     )
                 )
+
+        # oc-bridge is required for the dev environment.
+        self._console.header("Bridge")
+        bridge_result = BridgeService(
+            workspace=self._workspace,
+            platform=self._platform,
+            config=self._config,
+            console=self._console,
+        ).build(dry_run=dry_run)
+        if isinstance(bridge_result, Err):
+            return Err(
+                SetupError(
+                    kind="bridge_failed",
+                    message=bridge_result.error.message,
+                    hint=bridge_result.error.hint,
+                )
+            )
 
         if not skip_tools:
             self._console.header("Tools")

@@ -4,7 +4,6 @@
 Each checker is responsible for a specific domain:
 - WorkspaceChecker: Validates workspace structure (repos, config)
 - ToolsChecker: Validates tools installation
-- SystemChecker: Validates system dependencies (SDL2, ALSA)
 - SystemChecker: Validates system dependencies (SDL2, ALSA, libudev, pkg-config, C compiler)
 - RuntimeChecker: Validates runtime environment (virmidi, serial)
 """

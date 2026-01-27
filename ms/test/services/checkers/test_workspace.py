@@ -106,7 +106,7 @@ class TestWorkspaceChecker:
             platform=Platform.LINUX,
         )
         result = checker.check_bridge()
-        assert result.status == CheckStatus.WARNING
+        assert result.status == CheckStatus.ERROR
         assert "not built" in result.message
 
     def test_check_bridge_built(self, temp_workspace: Workspace) -> None:

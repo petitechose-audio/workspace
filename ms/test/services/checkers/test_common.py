@@ -9,9 +9,11 @@ from ms.platform.detection import LinuxDistro, Platform
 from ms.services.checkers.common import (
     DefaultCommandRunner,
     Hints,
+    format_version_triplet,
     first_line,
     get_platform_key,
     load_hints,
+    parse_version_triplet,
 )
 
 
@@ -67,6 +69,17 @@ class TestGetPlatformKey:
 
     def test_unknown_platform(self) -> None:
         assert get_platform_key(Platform.UNKNOWN) == "debian"
+
+
+class TestVersionTriplet:
+    def test_parse_triplet_found(self) -> None:
+        assert parse_version_triplet("rustc 1.93.0 (abcdef 2026-01-01)") == (1, 93, 0)
+
+    def test_parse_triplet_missing(self) -> None:
+        assert parse_version_triplet("no version here") is None
+
+    def test_format_triplet(self) -> None:
+        assert format_version_triplet((1, 2, 3)) == "1.2.3"
 
 
 class TestHints:
