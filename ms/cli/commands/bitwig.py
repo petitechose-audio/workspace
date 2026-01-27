@@ -28,9 +28,7 @@ class Mode(Enum):
     HW_FULL = auto()  # build + upload + monitor (default)
 
 
-def _resolve_mode(
-    build: bool, upload: bool, native: bool, web: bool, extension: bool
-) -> Mode:
+def _resolve_mode(build: bool, upload: bool, native: bool, web: bool, extension: bool) -> Mode:
     """Determine build mode from CLI flags (first match wins)."""
     if extension:
         return Mode.EXTENSION
@@ -48,6 +46,7 @@ def _resolve_mode(
 def bitwig(
     build: bool = typer.Option(False, "--build", help="HW: build only"),
     upload: bool = typer.Option(False, "--upload", help="HW: build + upload"),
+    env: str | None = typer.Option(None, "--env", help="HW: PlatformIO env (e.g. dev, release)"),
     native: bool = typer.Option(False, "--native", help="Sim: build + run"),
     web: bool = typer.Option(False, "--web", help="Sim: build + serve"),
     extension: bool = typer.Option(False, "--extension", help="Build + deploy .bwextension"),
@@ -112,10 +111,10 @@ def bitwig(
 
     match mode:
         case Mode.HW_BUILD:
-            exit_on_error(hw.build(app, dry_run=dry_run), ctx)
+            exit_on_error(hw.build(app, env=env, dry_run=dry_run), ctx)
 
         case Mode.HW_UPLOAD:
-            exit_on_error(hw.upload(app, dry_run=dry_run), ctx)
+            exit_on_error(hw.upload(app, env=env, dry_run=dry_run), ctx)
 
         case Mode.HW_FULL:
-            exit_with_code(hw.monitor(app))
+            exit_with_code(hw.monitor(app, env=env))

@@ -1,32 +1,68 @@
-# Phase 2: Bootstrap prereqs (uv-only launch)
+# Phase 2: Bootstrap + Global CLI (uv tool)
 
-**Scope**: prereqs + system install + hints
+**Scope**: prereqs + system install + hints + global CLI install + workspace default
 **Status**: planned
 **Created**: 2026-01-27
 **Updated**: 2026-01-27
 
 ## Goal
 
-- `uv run ms setup` can start with only `uv` available.
-- If `git` is missing, `ms` guides installation and can execute safe install commands.
+- `ms` and `oc-*` are usable without `uv run` (optional global install via `uv tool`).
+- `ms` is useful outside the workspace tree by remembering a single default workspace root.
+- Workspace resolution order is explicit and predictable:
+  - `--workspace` (CLI) / `WORKSPACE_ROOT` (env)
+  - cwd upward search for `.ms-workspace`
+  - remembered default workspace
+- `uv run ms ...` remains the canonical, non-invasive entrypoint (no global install required).
+- If `git` is missing, `ms` guides installation and can execute safe allowlisted install commands.
 - `ms` never runs arbitrary shell snippets; only allowlisted installers.
 
 ## Planned commits (atomic)
 
-1. `refactor(prereqs): require only what is needed per step`
-   - Remove `gh` requirement.
-   - Remove rust toolchain requirement (bridge will be prebuilt later).
-   - Gate `git` only when needed (repo sync, emsdk git install).
+1. `feat(workspace): remember default workspace`
+   - Add a small user-level config file storing `workspace_root` (single).
+   - Add commands:
+     - `ms use [PATH]` (default: `.`)
+     - `ms where`
+     - `ms forget`
+   - Update `ms` context building to fall back to remembered workspace when cwd/env do not resolve.
 
-2. `feat(prereqs): install git automatically when safe`
+2. `feat(self): install/uninstall ms via uv tool`
+   - Add commands:
+     - `ms self install` (installs `ms` + `oc-*` globally via `uv tool install`)
+     - `ms self uninstall` (removes global commands via `uv tool uninstall`)
+   - Add optional helper:
+     - `ms self update-shell` (runs `uv tool update-shell`)
+   - Ensure the UX is explicit about what is modified (PATH) and how to revert.
+
+3. `feat(setup): optionally install CLI and remember workspace`
+   - Add `ms setup` flags:
+     - `--install-cli` (calls `ms self install`)
+     - `--update-shell` (calls `ms self update-shell`)
+     - `--remember-workspace` (calls `ms use .`)
+   - Default behavior stays non-invasive (no global install without an explicit flag).
+
+4. `refactor(prereqs): require only what is needed per step`
+   - Gate `git` only when needed (repo sync, emsdk git install).
+   - Keep `gh` and Rust requirements as-is for now.
+     - Dropping `gh` is Phase 3.
+     - Dropping Rust/cargo is Phase 4.
+
+5. `feat(prereqs): install git automatically when safe`
    - Windows: prefer `winget install --id Git.Git -e` when available.
    - macOS: `xcode-select --install` (interactive, must stop+relaunch).
    - Ubuntu: `sudo apt install -y git`
    - Fedora: `sudo dnf install -y git`
 
-3. `feat(install): group package installs per manager (apt/dnf/winget)`
+6. `feat(install): group package installs per manager (apt/dnf/winget)`
    - Group packages into a single command per package manager.
    - Deduplicate packages.
+
+7. `feat(self): wipe/destroy workspace (explicit)`
+   - Add safe cleanup verbs for end-users:
+     - `ms wipe` deletes generated artifacts only (e.g. `.ms/`, `tools/`, `bin/`, `.build/`).
+     - `ms destroy` is an explicit, confirmed operation to delete the entire workspace directory.
+   - Keep defaults non-destructive; require confirmation / `--yes`.
 
 ## Work log
 
@@ -44,16 +80,31 @@
 
 ```bash
 uv run pytest ms/test -q
+uv run ms --help
+uv run ms check
 uv run ms prereqs --dry-run
 uv run ms setup --dry-run
 ```
 
 Manual validation checklist:
 
-- Windows fresh shell:
-  - With no `git` in PATH: `ms prereqs --install` proposes `winget` or a manual URL.
-- Ubuntu/Fedora:
-  - `ms prereqs --install` proposes `sudo apt/dnf install ...`.
+- Global install:
+  - From workspace root: `uv tool install -e .`
+  - Ensure PATH: `uv tool update-shell`
+  - From a random directory: `ms where` resolves to remembered workspace.
+  - From inside a PlatformIO project: `oc-build` finds `platformio.ini`.
+
+- Prereqs install:
+  - Windows fresh shell:
+    - With no `git` in PATH: `ms prereqs --install` proposes `winget` or a manual URL.
+  - Ubuntu/Fedora:
+    - `ms prereqs --install` proposes `sudo apt/dnf install ...`.
+
+Opt-in network tests:
+
+```bash
+uv run pytest -m network
+```
 
 ## Sources
 
@@ -61,4 +112,6 @@ Manual validation checklist:
 - `ms/services/system_install.py`
 - `ms/services/checkers/tools.py`
 - `ms/services/checkers/system.py`
+- `ms/cli/context.py`
+- `ms/core/workspace.py`
 - `ms/data/hints.toml`

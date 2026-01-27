@@ -1,11 +1,14 @@
-"""Hardware build service using open-control CLI tools.
+"""Hardware build service.
 
-Wraps oc-build, oc-upload, oc-monitor scripts for Teensy firmware operations.
+Wraps the oc-* Python commands (oc-build, oc-upload, oc-monitor)
+for Teensy firmware operations.
 """
 
 from __future__ import annotations
 
 import subprocess
+import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -20,9 +23,6 @@ if TYPE_CHECKING:
 
 __all__ = ["HardwareError", "HardwareService"]
 
-# Git Bash path on Windows (avoid WSL bash)
-_GIT_BASH = Path("C:/Program Files/Git/usr/bin/bash.exe")
-
 
 @dataclass(frozen=True, slots=True)
 class HardwareError:
@@ -34,76 +34,54 @@ class HardwareError:
 
 
 class HardwareService(BaseService):
-    """Hardware builds using open-control CLI tools."""
+    """Hardware builds using the oc-* Python commands."""
 
-    def build(self, app: App, *, dry_run: bool = False) -> Result[None, HardwareError]:
+    def build(
+        self,
+        app: App,
+        *,
+        env: str | None = None,
+        dry_run: bool = False,
+    ) -> Result[None, HardwareError]:
         """Build firmware using oc-build."""
         if not app.has_teensy:
-            return Err(
-                HardwareError("no_platformio", f"no platformio.ini in {app.path}")
-            )
+            return Err(HardwareError("no_platformio", f"no platformio.ini in {app.path}"))
 
-        script = self._oc_script("oc-build")
-        if script is None:
-            return Err(
-                HardwareError("script_missing", "oc-build not found", "Run: ms sync --repos")
-            )
+        return self._run_oc("oc_build", app.path, "build", env=env, dry_run=dry_run)
 
-        return self._run_script(script, app.path, "build", dry_run=dry_run)
-
-    def upload(self, app: App, *, dry_run: bool = False) -> Result[None, HardwareError]:
+    def upload(
+        self,
+        app: App,
+        *,
+        env: str | None = None,
+        dry_run: bool = False,
+    ) -> Result[None, HardwareError]:
         """Build and upload firmware using oc-upload."""
         if not app.has_teensy:
-            return Err(
-                HardwareError("no_platformio", f"no platformio.ini in {app.path}")
-            )
+            return Err(HardwareError("no_platformio", f"no platformio.ini in {app.path}"))
 
-        script = self._oc_script("oc-upload")
-        if script is None:
-            return Err(
-                HardwareError("script_missing", "oc-upload not found", "Run: ms sync --repos")
-            )
+        return self._run_oc("oc_upload", app.path, "upload", env=env, dry_run=dry_run)
 
-        return self._run_script(script, app.path, "upload", dry_run=dry_run)
-
-    def monitor(self, app: App) -> int:
+    def monitor(self, app: App, *, env: str | None = None) -> int:
         """Build, upload, and monitor using oc-monitor."""
         if not app.has_teensy:
             self._console.error(f"no platformio.ini in {app.path}")
             return 1
 
-        script = self._oc_script("oc-monitor")
-        if script is None:
-            self._console.error("oc-monitor not found")
-            return 1
+        cmd = self._oc_cmd("oc_monitor", env=env)
+        self._console.print(" ".join(cmd[:4]) + " ...", Style.DIM)
 
-        bash = self._bash_cmd()
-        self._console.print(f"{bash} {script}", Style.DIM)
-
-        # oc-monitor takes over the terminal and doesn't return
-        env = self._build_env()
+        # oc-monitor takes over the terminal
+        env_vars = self._build_env()
         try:
             result = subprocess.run(
-                [bash, str(script)],
+                cmd,
                 cwd=app.path,
-                env={**subprocess.os.environ, **env},  # type: ignore[attr-defined]
+                env={**os.environ, **env_vars},
             )
             return result.returncode
         except KeyboardInterrupt:
             return 0
-
-    def _oc_script(self, name: str) -> Path | None:
-        """Get path to open-control CLI script."""
-        script = self._workspace.open_control_dir / "cli-tools" / "bin" / name
-        if script.exists():
-            return script
-        return None
-
-    def _bash_cmd(self) -> str:
-        """Get bash command - use Git Bash on Windows to avoid WSL."""
-        if self._platform.platform.is_windows and _GIT_BASH.exists():
-            return str(_GIT_BASH)
-        return "bash"
 
     def _build_env(self) -> dict[str, str]:
         """Build environment with PIO path and platformio directories."""
@@ -118,34 +96,43 @@ class HardwareService(BaseService):
             env["PIO"] = str(pio_bin)
         return env
 
-    def _run_script(
-        self, script: Path, cwd: Path, action: str, *, dry_run: bool
+    def _oc_cmd(self, module: str, *, env: str | None) -> list[str]:
+        cmd = [sys.executable, "-m", f"ms.oc_cli.{module}"]
+        if env:
+            cmd.append(env)
+        return cmd
+
+    def _run_oc(
+        self,
+        module: str,
+        cwd: Path,
+        action: str,
+        *,
+        env: str | None,
+        dry_run: bool,
     ) -> Result[None, HardwareError]:
-        """Run an oc-* script."""
-        bash = self._bash_cmd()
-        self._console.print(f"{bash} {script}", Style.DIM)
+        """Run an oc-* python module."""
+        cmd = self._oc_cmd(module, env=env)
+        self._console.print(" ".join(cmd[:4]) + " ...", Style.DIM)
 
         if dry_run:
             return Ok(None)
 
-        env = self._build_env()
+        env_vars = self._build_env()
         try:
             result = subprocess.run(
-                [bash, str(script)],
+                cmd,
                 cwd=cwd,
-                env={**subprocess.os.environ, **env},  # type: ignore[attr-defined]
+                env={**os.environ, **env_vars},
             )
-            match result.returncode:
-                case 0:
-                    return Ok(None)
-                case code:
-                    return Err(
-                        HardwareError(
-                            f"{action}_failed",  # type: ignore[arg-type]
-                            f"{action} failed with code {code}",
-                        )
-                    )
-        except FileNotFoundError:
-            return Err(
-                HardwareError("script_missing", "bash not found", "Install Git Bash")
+        except OSError as e:
+            return Err(HardwareError("script_missing", str(e)))
+
+        if result.returncode == 0:
+            return Ok(None)
+        return Err(
+            HardwareError(
+                f"{action}_failed",  # type: ignore[arg-type]
+                f"{action} failed with code {result.returncode}",
             )
+        )

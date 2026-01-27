@@ -23,38 +23,37 @@ def copy_to_clipboard(text: str) -> bool:
 def _copy_windows(text: str) -> bool:
     """Copy to clipboard on Windows using clip.exe."""
     try:
-        process = subprocess.Popen(
+        proc = subprocess.run(
             ["clip"],
-            stdin=subprocess.PIPE,
-            shell=True,
+            input=text.encode("utf-8"),
+            check=False,
         )
-        process.communicate(text.encode("utf-8"))
-        return process.returncode == 0
-    except Exception:
+        return proc.returncode == 0
+    except OSError:
         return False
 
 
 def _copy_macos(text: str) -> bool:
     """Copy to clipboard on macOS using pbcopy."""
     try:
-        process = subprocess.Popen(
+        proc = subprocess.run(
             ["pbcopy"],
-            stdin=subprocess.PIPE,
+            input=text.encode("utf-8"),
+            check=False,
         )
-        process.communicate(text.encode("utf-8"))
-        return process.returncode == 0
-    except Exception:
+        return proc.returncode == 0
+    except OSError:
         return False
 
 
 def _copy_linux(text: str) -> bool:
     """Copy to clipboard on Linux using xclip."""
     try:
-        process = subprocess.Popen(
+        proc = subprocess.run(
             ["xclip", "-selection", "clipboard"],
-            stdin=subprocess.PIPE,
+            input=text.encode("utf-8"),
+            check=False,
         )
-        process.communicate(text.encode("utf-8"))
-        return process.returncode == 0
-    except Exception:
+        return proc.returncode == 0
+    except OSError:
         return False

@@ -26,7 +26,11 @@
 
 - 2026-01-27 (windows):
   - `uv run ms --help` ok
-  - `uv run pytest ms/test -q` -> 896 passed, 7 skipped
+  - `uv run ms check` ok
+  - `uv run oc-build --help` ok
+  - `uv run oc-upload --help` ok
+  - `uv run oc-monitor --help` ok
+  - `uv run pytest ms/test -q` -> 899 passed, 7 skipped, 6 deselected (network)
 
 ## Notes
 

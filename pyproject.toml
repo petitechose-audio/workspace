@@ -17,6 +17,9 @@ dev = [
 
 [project.scripts]
 ms = "ms.cli.app:main"
+oc-build = "ms.oc_cli.oc_build:main"
+oc-upload = "ms.oc_cli.oc_upload:main"
+oc-monitor = "ms.oc_cli.oc_monitor:main"
 
 [tool.uv]
 package = true
@@ -28,7 +31,7 @@ include = ["ms", "ms.*"]
 testpaths = ["ms/test"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -m \"not network\""
 markers = [
     "network: marks tests as requiring network access (deselect with '-m \"not network\"')",
 ]

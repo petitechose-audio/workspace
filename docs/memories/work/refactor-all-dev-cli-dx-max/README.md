@@ -1,7 +1,7 @@
 # Refactor: Dev CLI DX Max (Deshellize + Bootstrap)
 
 **Scope**: all (ms + open-control + midi-studio orchestration)
-**Status**: planned
+**Status**: started
 **Created**: 2026-01-27
 **Updated**: 2026-01-27
 
@@ -17,7 +17,8 @@ Construire une CLI `ms`:
 
 ## Invariants (non-negociables)
 
-- Entree unique: `uv run ms ...`
+- Entree canonical (non-invasive): `uv run ms ...`
+- Optionnel: installer `ms` + `oc-*` globalement (user-level) via `uv tool` pour eviter `uv run`.
 - Pas de dossier/commande legacy (ex: `commands/`, wrappers historiques, completions legacy)
 - Tout ce que `ms` execute:
   - jamais via `shell=True`
@@ -42,7 +43,7 @@ Construire une CLI `ms`:
 
 ## Etat actuel (points bloquants)
 
-- `ms/services/hardware.py` depend de `bash` + scripts `open-control/cli-tools/bin/oc-*`.
+- Hardware: supprimer toute dependance a bash (oc-* doit etre en Python et runnable via `uv`/`uv tool`).
 - `ms/services/repos.py` depend de `gh` et d'auth GH.
 - `ms/services/bridge.py` depend de Rust/cargo et d'un linker C.
 - `ms/services/checkers/system.py` impose Homebrew sur macOS.
@@ -80,73 +81,64 @@ Chaque commit doit:
 
 **But**: `ms` ne depend plus de bash pour le workflow hardware.
 
-1. Commit: `chore(repo): remove bootstrap shell entrypoints`
+1. Commit: `chore(cli): remove legacy shell entrypoints`
    - Supprimer `setup-minimal.sh`.
    - Supprimer `commands/` (wrappers + completions legacy).
    - Test: `uv run ms --help`.
 
-2. Commit: `refactor(hardware): run PlatformIO directly (no oc-* scripts)`
-   - Re-ecrire `ms/services/hardware.py`:
-     - utiliser `tools/platformio/venv/.../pio` (via ToolRegistry) + env vars workspace (`Workspace.platformio_env_vars()`).
-     - `build`: `pio run -e <env> -d <app_dir>`
-     - `upload`: `pio run -e <env> -d <app_dir> -t nobuild -t upload`
-     - `monitor`: `pio device monitor -d <app_dir> --quiet --raw` (+ option port)
-   - Retirer toute reference a `bash`, `Git Bash`, `oc-build`, `oc-upload`, `oc-monitor`.
-   - Test: unit tests (voir ci-dessous).
+2. Commit: `feat(oc-cli): port oc-* scripts to python`
+   - Ajouter `oc-build`, `oc-upload`, `oc-monitor` en Python (meme UX) et executables via `uv run`.
 
-3. Commit: `feat(hardware): add env selection + defaults`
-   - Ajouter `--env` (dev/release) aux commandes CLI qui appellent HardwareService.
-   - Default = lire `platformio.ini` (`default_envs`) sinon `dev`.
-   - Test: unit tests parsing INI.
+3. Commit: `refactor(hardware): call python oc-* from ms`
+   - `ms/services/hardware.py` n'appelle plus bash; il lance `python -m ms.oc_cli.oc_*`.
+   - Ajouter `--env` passthrough sur `ms core` / `ms bitwig`.
 
-4. Commit: `test(hardware): add cross-platform command construction tests`
-   - Tests sans appeler PlatformIO reel:
-     - le service construit la bonne commande + cwd + env
-     - Windows: selection du bon binaire (`Scripts/pio.exe`)
-     - Unix: selection (`bin/pio`)
+4. Commit: `test(hardware): add command construction tests`
+   - Tests sans appeler PlatformIO reel (commande/cwd/env).
 
-5. Commit: `fix(platform): remove shell=True usage`
+5. Commit: `test(pytest): skip network tests by default`
+   - Les tests `@network` deviennent opt-in.
+
+6. Commit: `fix(platform): remove shell=True usage`
    - Modifier `ms/platform/clipboard.py` pour ne jamais utiliser `shell=True`.
-   - Test: unit test simple (appel construit sans shell).
 
-### Phase 2 — Bootstrap prereqs (uv-only launch)
+### Phase 2 — Bootstrap + Global CLI (uv tool)
 
-**But**: `uv run ms setup` fonctionne meme si `git` manque; `ms` propose et peut installer.
+**But**: `ms` et `oc-*` peuvent etre utilises sans `uv run`, et `ms` reste utile hors workspace via un workspace par defaut memorise.
 
-6. Commit: `refactor(prereqs): require only what is needed per step`
-   - Modifier `PrereqsService.ensure()` + CLI `ms prereqs`:
-     - supprimer `require_gh`/`require_gh_auth`.
-     - supprimer `rustc/cargo` comme prerequis bloquant.
-     - `git` devient requis uniquement si `sync repos` ou `tools` (emsdk) est selectionne.
+7. Commit: `feat(workspace): remember default workspace`
+   - `ms use|where|forget` (single workspace)
+   - fallback workspace (env/cwd/memo)
 
-7. Commit: `feat(prereqs): install git automatically when safe`
-   - Windows:
-     - si `winget` present => hint `winget install --id Git.Git -e`.
-     - sinon hint manuel `https://git-scm.com/download/win`.
-   - macOS:
-     - hint `xcode-select --install` (donne git + toolchain).
-   - Ubuntu/Fedora:
-     - hints `sudo apt install -y git` / `sudo dnf install -y git`.
-   - Test: unit tests sur generation de hint selon plateforme.
+8. Commit: `feat(self): install/uninstall ms via uv tool`
+   - `ms self install|uninstall|update-shell` (UX explicite + reversible)
 
-8. Commit: `feat(install): group package installs per manager (apt/dnf/winget)`
-   - Ameliorer `SystemInstaller.plan_installation()`:
-     - grouper les installs par tool (un seul `apt install ...` au lieu de N).
-     - deduper les paquets.
-   - Test: unit tests sur grouping.
+9. Commit: `feat(setup): optionally install CLI and remember workspace`
+   - flags `--install-cli`, `--update-shell`, `--remember-workspace`
+
+10. Commit: `refactor(prereqs): require only what is needed per step`
+   - `git` requis uniquement quand necessaire
+   - `gh` (Phase 3) et Rust/cargo (Phase 4) restent separes
+
+11. Commit: `feat(prereqs): install git automatically when safe`
+   - Windows/macOS/Ubuntu/Fedora
+
+12. Commit: `feat(install): group package installs per manager (apt/dnf/winget)`
+
+13. Commit: `feat(self): wipe/destroy workspace (explicit)`
 
 ### Phase 3 — Repo sync sans gh (git-only)
 
 **But**: sync repos deterministe, sans `gh`.
 
-9. Commit: `feat(repos): add pinned repo manifest`
+14. Commit: `feat(repos): add pinned repo manifest`
    - Ajouter `ms/data/repos.toml` avec:
      - repos requis
      - chemin de checkout
      - branche cible
      - URL HTTPS
 
-10. Commit: `refactor(repos): sync from manifest (drop gh)`
+15. Commit: `refactor(repos): sync from manifest (drop gh)`
    - Re-ecrire `ms/services/repos.py`:
      - clone/pull --ff-only
      - skip dirty repos
@@ -158,13 +150,13 @@ Chaque commit doit:
 
 **But**: pas de Rust/cargo requis pour un dev setup.
 
-11. Commit: `feat(bridge): install oc-bridge from GitHub releases`
+16. Commit: `feat(bridge): install oc-bridge from GitHub releases`
     - Downloader d'asset par OS/arch.
     - Installer dans `bin/bridge/oc-bridge(.exe)`.
     - Copier `open-control/bridge/config` si present.
     - Tests unitaires: selection asset + erreur claire si plateforme non supportee.
 
-12. Commit: `refactor(setup): bridge step uses installer, not cargo`
+17. Commit: `refactor(setup): bridge step uses installer, not cargo`
     - `ms setup` appelle `ms bridge install`.
     - `BridgeService.build` devient optionnel (build-from-source) et non requis.
 
@@ -172,12 +164,12 @@ Chaque commit doit:
 
 **But**: setup macOS sans dependance brew (manual).
 
-13. Commit: `refactor(system-check): do not require brew on macos`
+18. Commit: `refactor(system-check): do not require brew on macos`
     - `SystemChecker` macOS:
       - exiger CLT (clang) via `xcode-select`.
       - SDL2: passer en WARNING si manquant (pas ERROR).
 
-14. Commit: `build(macos): fetch SDL2 when not found (macOS only)`
+19. Commit: `build(macos): fetch SDL2 when not found (macOS only)`
     - Dans `midi-studio/core/sdl/CMakeLists.txt`:
       - si macOS et `find_package(SDL2)` echoue => `FetchContent` SDL2 + build.
     - Test: CI macOS build native.
@@ -186,7 +178,7 @@ Chaque commit doit:
 
 **But**: une seule surface stable et coherent.
 
-15. Commit: `refactor(cli): verb-based commands`
+20. Commit: `refactor(cli): verb-based commands`
     - Ajouter/standardiser:
       - `ms list`
       - `ms build <app> --target native|wasm|teensy`
@@ -195,22 +187,22 @@ Chaque commit doit:
       - `ms upload <app> [--env]`
       - `ms monitor <app> [--env]`
 
-16. Commit: `refactor(cli): remove app-specific core/bitwig top-level commands`
+21. Commit: `refactor(cli): remove app-specific core/bitwig top-level commands`
     - Supprimer `ms core` / `ms bitwig` (ou les garder comme alias internes sans logique).
 
-17. Commit: `fix(hints): remove phantom commands; align hints to real CLI`
+22. Commit: `fix(hints): remove phantom commands; align hints to real CLI`
     - Remplacer partout `ms tools sync` / `ms repos sync` / `ms bridge install` fantomes.
 
 ### Phase 7 — CI multi-plateforme (validation continue)
 
-18. Commit: `ci: add smoke matrix (ubuntu/fedora/windows/macos)`
+23. Commit: `ci: add smoke matrix (ubuntu/fedora/windows/macos)`
     - Etapes par OS:
       - `uv run ms setup --dry-run`
       - `uv run ms check`
       - `uv run ms sync --tools --dry-run`
       - `uv run ms build core --target wasm --dry-run`
 
-19. Commit: `ci: add real builds where feasible`
+24. Commit: `ci: add real builds where feasible`
     - Ubuntu/Fedora: installer deps systeme via apt/dnf dans CI.
     - Lancer build wasm + native.
 
@@ -233,6 +225,7 @@ Chaque commit doit:
 
 - Windows:
   - `git` absent par defaut. Preferer `winget install --id Git.Git -e` si `winget` est present.
+  - PATH global (pour `ms`/`oc-*`): `uv tool update-shell`.
   - Apres installation, PATH peut ne pas etre rafraichi dans le process courant.
     - Strategie: re-detecter `git.exe` via chemins connus (ex: `C:\Program Files\Git\cmd\git.exe`) avant de demander un restart.
 
