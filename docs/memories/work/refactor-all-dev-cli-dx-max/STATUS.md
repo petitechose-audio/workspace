@@ -32,6 +32,7 @@
   - `uv run oc-build --help` ok
   - `uv run oc-upload --help` ok
   - `uv run oc-monitor --help` ok
+  - `uv run ms setup --dry-run --install-cli --update-shell --remember-workspace` ok
   - `uv run pytest ms/test -q` -> 905 passed, 7 skipped, 6 deselected (network)
 
 ## Notes

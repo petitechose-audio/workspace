@@ -76,6 +76,9 @@
 - 2026-01-27:
   - Added `ms self install|uninstall|update-shell` to manage global installation via `uv tool`.
 
+- 2026-01-27:
+  - Added `ms setup` flags: `--install-cli`, `--update-shell`, `--remember-workspace`.
+
 ## Decisions
 
 - Store the default workspace root in a dedicated user config file: `<user_config_dir>/workspace.toml`.
@@ -126,4 +129,5 @@ uv run pytest -m network
 - `ms/cli/commands/workspace.py`
 - `ms/cli/app.py`
 - `ms/cli/commands/self_cmd.py`
+- `ms/cli/commands/setup.py`
 - `ms/data/hints.toml`

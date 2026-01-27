@@ -5,6 +5,9 @@ import typer
 from ms.cli.context import build_context
 from ms.core.errors import ErrorCode
 from ms.core.result import Err, Ok
+from ms.core.user_workspace import remember_default_workspace_root
+from ms.output.console import Style
+from ms.platform.process import run_silent
 from ms.services.setup import SetupService
 
 
@@ -14,6 +17,21 @@ def setup(
     skip_tools: bool = typer.Option(False, "--skip-tools", help="Skip toolchain sync"),
     skip_python: bool = typer.Option(False, "--skip-python", help="Skip Python deps sync"),
     skip_check: bool = typer.Option(False, "--skip-check", help="Skip final check"),
+    install_cli: bool = typer.Option(
+        False,
+        "--install-cli",
+        help="Install ms/oc-* globally via `uv tool`",
+    ),
+    update_shell: bool = typer.Option(
+        False,
+        "--update-shell",
+        help="Ensure the uv tool bin directory is on PATH",
+    ),
+    remember_workspace: bool = typer.Option(
+        False,
+        "--remember-workspace",
+        help="Remember this workspace as the default",
+    ),
     skip_prereqs: bool = typer.Option(
         False,
         "--skip-prereqs",
@@ -51,6 +69,40 @@ def setup(
     )
     match result:
         case Ok(_):
+            # Optional post-setup helpers
+            if remember_workspace:
+                if dry_run:
+                    ctx.console.print(
+                        f"would set default workspace: {ctx.workspace.root}",
+                        Style.DIM,
+                    )
+                else:
+                    saved = remember_default_workspace_root(ctx.workspace.root)
+                    if isinstance(saved, Err):
+                        ctx.console.error(saved.error.message)
+                        raise typer.Exit(code=int(ErrorCode.IO_ERROR))
+                    ctx.console.success(f"default workspace set: {ctx.workspace.root}")
+
+            if install_cli:
+                cmd = ["uv", "tool", "install", str(ctx.workspace.root)]
+                ctx.console.print(" ".join(cmd), Style.DIM)
+                if not dry_run:
+                    ires = run_silent(cmd, cwd=ctx.workspace.root)
+                    if isinstance(ires, Err):
+                        ctx.console.error(str(ires.error))
+                        raise typer.Exit(code=int(ErrorCode.ENV_ERROR))
+                    ctx.console.success("installed global CLI")
+
+            if update_shell:
+                cmd = ["uv", "tool", "update-shell"]
+                ctx.console.print(" ".join(cmd), Style.DIM)
+                if not dry_run:
+                    ures = run_silent(cmd, cwd=ctx.workspace.root)
+                    if isinstance(ures, Err):
+                        ctx.console.error(str(ures.error))
+                        raise typer.Exit(code=int(ErrorCode.ENV_ERROR))
+                    ctx.console.success("PATH updated (restart your shell)")
+
             ctx.console.newline()
             ctx.console.success("Setup complete")
         case Err(e):
