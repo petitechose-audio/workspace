@@ -3,7 +3,7 @@
 **Scope**: all
 **Status**: started
 **Created**: 2026-01-27
-**Updated**: 2026-01-27
+**Updated**: 2026-01-28
 
 ## Goal
 
@@ -14,11 +14,11 @@
 
 ## Phases
 
-- Phase 1 (deshellize): started
+- Phase 1 (deshellize): completed
 - Phase 2 (bootstrap prereqs): completed
 - Phase 3 (repos git-only): completed
 - Phase 4 (bridge prebuilt): completed
-- Phase 5 (macos without brew): started
+- Phase 5 (macos without brew): completed
 - Phase 5a (type-safety contract): completed
 - Phase 6 (cli unified verbs): completed
 - Phase 7 (ci matrix): started

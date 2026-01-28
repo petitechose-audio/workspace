@@ -1,9 +1,9 @@
 # Phase 1: Deshellize
 
 **Scope**: ms (hardware + platform utilities) + repo hygiene
-**Status**: started
+**Status**: completed
 **Created**: 2026-01-27
-**Updated**: 2026-01-27
+**Updated**: 2026-01-28
 
 ## Goal
 

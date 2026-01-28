@@ -1,9 +1,9 @@
 # Phase 5: macOS without Homebrew requirement
 
 **Scope**: system checks + native build deps on macOS
-**Status**: started
+**Status**: completed
 **Created**: 2026-01-27
-**Updated**: 2026-01-27
+**Updated**: 2026-01-28
 
 ## Goal
 
@@ -33,7 +33,7 @@
 
 ## Decisions
 
-- (pending)
+- Prefer Xcode CLT as the mandatory baseline; Homebrew remains optional.
 
 ## Plan deviations
 
@@ -47,6 +47,8 @@ In CI (macos-latest):
 uv run ms check
 uv run ms build core --target native
 ```
+
+Note: CI validation should be observed on a real macOS runner. Local macOS verification is not currently available.
 
 ## Sources
 
