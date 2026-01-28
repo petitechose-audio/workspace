@@ -1,7 +1,7 @@
 # Repo migration: petitechose-audio/workspace -> midi-studio/ms-dev-env
 
 **Scope**: repository ownership + naming + visibility
-**Status**: planned
+**Status**: started
 **Created**: 2026-01-28
 **Updated**: 2026-01-28
 
@@ -10,6 +10,14 @@
 - Transfer the dev environment repo into the `midi-studio` org for governance/coherence.
 - Rename it to an explicit name: `ms-dev-env`.
 - Make the repository public.
+
+## Current state
+
+- [x] Repo is public
+- [x] GitHub Pages enabled (source: GitHub Actions)
+- [ ] Transfer ownership to `midi-studio`
+- [ ] Rename to `ms-dev-env`
+- [ ] Update local `origin` and any documented URLs
 
 ## Notes
 
@@ -93,3 +101,9 @@ If old links exist:
 ```bash
 git clone https://github.com/midi-studio/ms-dev-env.git
 ```
+
+## Work log
+
+- 2026-01-28:
+  - Repository set to public.
+  - GitHub Pages enabled (source: GitHub Actions).

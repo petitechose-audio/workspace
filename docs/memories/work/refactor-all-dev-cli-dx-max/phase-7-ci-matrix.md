@@ -49,6 +49,7 @@
     - Native builds on all OS targets (Windows/macOS/Linux).
     - WASM builds only on Ubuntu.
     - Added Bitwig simulator builds (native everywhere, wasm on Ubuntu).
+  - Added a Pages deploy job to publish the demo site artifacts.
 
 ## Decisions
 

@@ -10,6 +10,9 @@ Every step is designed to be small, testable, and traceable.
 - Full Builds is green (baseline run):
   - https://github.com/petitechose-audio/workspace/actions/runs/21435915307
 
+- Repo is public.
+- GitHub Pages is enabled (source: GitHub Actions).
+
 ## Step 1: Finalize Phase 7 (CI matrix)
 
 **Goal**: adjust CI to match product intent:
@@ -78,9 +81,9 @@ If browsers block it (mixed content), fallback is:
 
 - host the same static files locally via `ms web <app>` (HTTP localhost is treated as a secure origin)
 
-### 2.2 Add a Pages workflow
+### 2.2 Add a Pages deploy job
 
-Add a GitHub Actions workflow:
+Add a GitHub Actions deploy job (either as its own workflow or as part of Full Builds):
 
 - builds WASM on Ubuntu only
 - copies artifacts into a Pages site layout:

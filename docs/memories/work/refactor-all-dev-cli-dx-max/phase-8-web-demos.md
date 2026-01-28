@@ -83,7 +83,11 @@ Note: repository migration will change the base URL.
 
 ## Work log
 
-- 2026-01-28: phase created (plan aligned; implementation started).
+- 2026-01-28:
+  - Phase created (plan aligned).
+  - Repo is public and GitHub Pages is enabled (source: GitHub Actions).
+  - Added tracked demo site skeleton under `site/demo/`.
+  - Added Pages deploy job (publishes `/demo/core/latest/` + `/demo/bitwig/latest/`).
 
 ## Sources
 
