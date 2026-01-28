@@ -8,7 +8,7 @@ Every step is designed to be small, testable, and traceable.
 - CLI Phase 6 is done (verb-based `ms` surface).
 - CI smoke is green.
 - Full Builds is green (including Pages deploy):
-  - https://github.com/petitechose-audio/workspace/actions/runs/21448140321
+  - https://github.com/petitechose-midi-studio/ms-dev-env/actions/runs/21448140321
 
 - Repo is public.
 - GitHub Pages is enabled (source: GitHub Actions).
@@ -111,7 +111,7 @@ Add tracked HTML pages that:
 - Set `docs/memories/work/refactor-all-dev-cli-dx-max/phase-8-web-demos.md` to `started` when implementation begins.
 - Set to `completed` once Pages deploy is verified.
 
-## Step 3: Repo migration to `midi-studio/ms-dev-env`
+## Step 3: Repo migration to `petitechose-midi-studio/ms-dev-env`
 
 **Goal**: governance + naming + visibility coherence.
 
@@ -119,7 +119,7 @@ Steps are documented in:
 
 - `docs/memories/work/refactor-all-dev-cli-dx-max/repo-migration.md`
 
-### Verification
+### Verification (done)
 
 - repo exists under org + correct name + public
 - local `origin` updated

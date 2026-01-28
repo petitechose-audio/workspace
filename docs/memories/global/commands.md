@@ -50,21 +50,23 @@ uv run protocol-codegen --help
 
 ```bash
 # Voir tous les repos
-find ~/petitechose-audio -maxdepth 3 -name ".git" -type d
+WS=~/ms-dev-env
+find "$WS" -maxdepth 3 -name ".git" -type d
 
 # Status de tous les repos
-for d in ~/petitechose-audio/open-control/*/; do echo "=== $d ===" && git -C "$d" status -s; done
-for d in ~/petitechose-audio/midi-studio/*/; do echo "=== $d ===" && git -C "$d" status -s; done
+for d in "$WS"/open-control/*/; do echo "=== $d ===" && git -C "$d" status -s; done
+for d in "$WS"/midi-studio/*/; do echo "=== $d ===" && git -C "$d" status -s; done
 ```
 
 ## Recherche
 
 ```bash
 # Chercher dans le code
-grep -rn "pattern" --include="*.hpp" --include="*.cpp" ~/petitechose-audio
+WS=~/ms-dev-env
+grep -rn "pattern" --include="*.hpp" --include="*.cpp" "$WS"
 
 # Fichiers modifiés récemment
-find ~/petitechose-audio -name "*.hpp" -mtime -1 | grep -v .pio | grep -v .git
+find "$WS" -name "*.hpp" -mtime -1 | grep -v .pio | grep -v .git
 ```
 
 ---

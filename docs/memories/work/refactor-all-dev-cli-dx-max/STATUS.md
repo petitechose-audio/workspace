@@ -28,10 +28,10 @@
 
 - 2026-01-28 (ci):
   - Full Builds green (native all OS + wasm ubuntu + Pages deploy):
-    - https://github.com/petitechose-audio/workspace/actions/runs/21448140321
+    - https://github.com/petitechose-midi-studio/ms-dev-env/actions/runs/21448140321
   - Pages demo URLs:
-    - https://petitechose-audio.github.io/workspace/demo/core/latest/
-    - https://petitechose-audio.github.io/workspace/demo/bitwig/latest/
+    - https://petitechose-midi-studio.github.io/ms-dev-env/demo/core/latest/
+    - https://petitechose-midi-studio.github.io/ms-dev-env/demo/bitwig/latest/
 
 - 2026-01-27 (windows, phase-6):
   - `uv run ms --help` ok (no legacy core/bitwig commands)

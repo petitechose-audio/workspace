@@ -1,13 +1,13 @@
-# Repo migration: petitechose-audio/workspace -> midi-studio/ms-dev-env
+# Repo migration: petitechose-audio/workspace -> petitechose-midi-studio/ms-dev-env
 
 **Scope**: repository ownership + naming + visibility
-**Status**: started
+**Status**: completed
 **Created**: 2026-01-28
 **Updated**: 2026-01-28
 
 ## Goal
 
-- Transfer the dev environment repo into the `midi-studio` org for governance/coherence.
+- Transfer the dev environment repo into the `petitechose-midi-studio` org for governance/coherence.
 - Rename it to an explicit name: `ms-dev-env`.
 - Make the repository public.
 
@@ -15,14 +15,14 @@
 
 - [x] Repo is public
 - [x] GitHub Pages enabled (source: GitHub Actions)
-- [ ] Transfer ownership to `midi-studio`
-- [ ] Rename to `ms-dev-env`
-- [ ] Update local `origin` and any documented URLs
+- [x] Transfer ownership to `petitechose-midi-studio`
+- [x] Rename to `ms-dev-env`
+- [x] Update local `origin` and documented URLs
 
 ## Notes
 
 - This repository is the "dev env bootstrapper" for MIDI Studio (and its open-control dependencies).
-  Keeping it in the `midi-studio` org matches the product scope.
+  Keeping it in the MIDI Studio org matches the product scope.
 
 - GitHub Pages base URL will change after transfer/rename.
   Plan for redirects if the old URL was shared publicly.
@@ -50,12 +50,12 @@ gh auth status
 Preferred (API via `gh api`):
 
 ```bash
-gh api -X POST repos/petitechose-audio/workspace/transfer -f new_owner=midi-studio
+gh api -X POST repos/petitechose-audio/workspace/transfer -f new_owner=petitechose-midi-studio
 ```
 
 If this fails with a 422 like:
 
-- "You don’t have the permission to create public repositories on midi-studio"
+- "You don’t have the permission to create public repositories on <org>"
 
 Then an org owner must either:
 
@@ -72,13 +72,13 @@ Notes:
 Once the repo is under the org:
 
 ```bash
-gh repo rename -R midi-studio/workspace ms-dev-env -y
+gh repo rename -R petitechose-midi-studio/workspace ms-dev-env -y
 ```
 
 ### 3) Make the repository public
 
 ```bash
-gh repo edit midi-studio/ms-dev-env \
+gh repo edit petitechose-midi-studio/ms-dev-env \
   --visibility public \
   --accept-visibility-change-consequences
 ```
@@ -88,14 +88,14 @@ Important: verify there are no committed secrets before doing this.
 ### 4) Update local git remotes
 
 ```bash
-git remote set-url origin https://github.com/midi-studio/ms-dev-env.git
+git remote set-url origin https://github.com/petitechose-midi-studio/ms-dev-env.git
 git remote -v
 ```
 
 ### 5) GitHub Pages URL update
 
 - New base URL will be:
-  - `https://midi-studio.github.io/ms-dev-env/`
+  - `https://petitechose-midi-studio.github.io/ms-dev-env/`
 
 If old links exist:
 
@@ -104,11 +104,11 @@ If old links exist:
 
 ## Verification
 
-- `gh repo view midi-studio/ms-dev-env --json nameWithOwner,visibility,url`
+- `gh repo view petitechose-midi-studio/ms-dev-env --json nameWithOwner,visibility,url`
 - Clone test:
 
 ```bash
-git clone https://github.com/midi-studio/ms-dev-env.git
+git clone https://github.com/petitechose-midi-studio/ms-dev-env.git
 ```
 
 ## Work log
@@ -119,3 +119,8 @@ git clone https://github.com/midi-studio/ms-dev-env.git
 
 - 2026-01-28:
   - Transfer attempt via API failed (HTTP 422): missing permission to create public repositories in `midi-studio`.
+
+- 2026-01-28:
+  - Repository transferred and renamed to:
+    - https://github.com/petitechose-midi-studio/ms-dev-env
+  - Local `origin` updated to the new URL.

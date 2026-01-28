@@ -15,7 +15,7 @@ Publish two static demo endpoints (always pointing to "latest"):
 The demos are meant to be **usable** (not just viewable): the browser simulator talks to a
 locally running `oc-bridge` using WebSocket.
 
-Note: repository migration will change the base URL.
+Note: the repository has been migrated once already, and the base URL may change again if moved to a different org.
 
 ## Architecture (facts)
 
@@ -91,8 +91,8 @@ Note: repository migration will change the base URL.
 
 - 2026-01-28:
   - Demo site deployed and reachable:
-    - https://petitechose-audio.github.io/workspace/demo/core/latest/
-    - https://petitechose-audio.github.io/workspace/demo/bitwig/latest/
+    - https://petitechose-midi-studio.github.io/ms-dev-env/demo/core/latest/
+    - https://petitechose-midi-studio.github.io/ms-dev-env/demo/bitwig/latest/
 
 ## Sources
 

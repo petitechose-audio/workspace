@@ -1,6 +1,6 @@
 # Memories
 
-Documentation persistante et mémoires de travail pour les projets petitechose-audio.
+Documentation persistante et mémoires de travail pour MIDI Studio (et OpenControl).
 
 ## Structure
 

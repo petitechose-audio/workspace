@@ -54,7 +54,7 @@
 
 - 2026-01-28:
   - Full Builds validated green (including Pages deploy):
-    - https://github.com/petitechose-audio/workspace/actions/runs/21448140321
+    - https://github.com/petitechose-midi-studio/ms-dev-env/actions/runs/21448140321
 
 ## Decisions
 
@@ -69,8 +69,8 @@
 
 - CI green on all OS targets.
 - Pages demo URLs respond:
-  - https://petitechose-audio.github.io/workspace/demo/core/latest/
-  - https://petitechose-audio.github.io/workspace/demo/bitwig/latest/
+  - https://petitechose-midi-studio.github.io/ms-dev-env/demo/core/latest/
+  - https://petitechose-midi-studio.github.io/ms-dev-env/demo/bitwig/latest/
 
 ## Sources
 
