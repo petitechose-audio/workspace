@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, Literal
+from typing import TYPE_CHECKING, Callable, Literal
 
 from ms.core.config import Config
 from ms.core.result import Err, Ok, Result
@@ -15,6 +16,9 @@ from ms.services.bridge import BridgeService
 from ms.services.repos import RepoService
 from ms.services.prereqs import PrereqsService
 from ms.services.toolchains import ToolchainService
+
+if TYPE_CHECKING:
+    from ms.services.check import CheckReport
 
 
 # -----------------------------------------------------------------------------
@@ -182,14 +186,42 @@ class SetupService:
                 config=self._config,
             ).run()
             if report.has_errors() and not dry_run:
+                self._print_check_issues(report)
                 return Err(
                     SetupError(
                         kind="check_failed",
                         message="workspace check found errors",
+                        hint="Run: uv run ms check",
                     )
                 )
 
         return Ok(None)
+
+    def _print_check_issues(self, report: "CheckReport") -> None:
+        from ms.services.checkers import CheckStatus
+
+        def print_group(title: str, results: Sequence[object]) -> None:
+            issues = [r for r in results if getattr(r, "status", None) != CheckStatus.OK]
+            if not issues:
+                return
+            self._console.print(title, Style.DIM)
+            for r in issues:
+                status = getattr(r, "status", None)
+                name = getattr(r, "name", "")
+                message = getattr(r, "message", "")
+                hint = getattr(r, "hint", None)
+
+                style = Style.ERROR if status == CheckStatus.ERROR else Style.WARNING
+                self._console.print(f"{name}: {message}", style)
+                if hint:
+                    self._console.print(f"hint: {hint}", Style.DIM)
+
+        self._console.newline()
+        self._console.error("Environment check failed")
+        print_group("Workspace", report.workspace)
+        print_group("Tools", report.tools)
+        print_group("System", report.system)
+        print_group("Runtime", report.runtime)
 
     def _write_state(self, *, mode: str) -> None:
         # Minimal, forward-compatible state.
