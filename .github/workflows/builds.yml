@@ -9,6 +9,11 @@ concurrency:
   group: full-builds-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   build:
     name: build (${{ matrix.os }})
@@ -21,8 +26,8 @@ jobs:
             build_native: true
             build_wasm: true
           - os: windows-latest
-            build_native: false
-            build_wasm: true
+            build_native: true
+            build_wasm: false
           - os: macos-latest
             build_native: true
             build_wasm: false
@@ -56,9 +61,17 @@ jobs:
         if: ${{ matrix.build_native }}
         run: uv run ms build core --target native
 
+      - name: Build bitwig (native)
+        if: ${{ matrix.build_native }}
+        run: uv run ms build bitwig --target native
+
       - name: Build core (wasm)
         if: ${{ matrix.build_wasm }}
         run: uv run ms build core --target wasm
+
+      - name: Build bitwig (wasm)
+        if: ${{ matrix.build_wasm }}
+        run: uv run ms build bitwig --target wasm
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -103,8 +116,8 @@ jobs:
       - name: Build core (native)
         run: uv run ms build core --target native
 
-      - name: Build core (wasm)
-        run: uv run ms build core --target wasm
+      - name: Build bitwig (native)
+        run: uv run ms build bitwig --target native
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -112,3 +125,41 @@ jobs:
           name: bin-fedora
           path: |
             bin
+
+  pages:
+    name: deploy demos (pages)
+    runs-on: ubuntu-latest
+    needs: [build, build_fedora]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Ubuntu artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bin-Linux
+
+      - name: Prepare site
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp -R site/* _site/
+          # WASM artifacts from the ubuntu build job
+          mkdir -p _site/demo/core/latest
+          mkdir -p _site/demo/bitwig/latest
+          cp -R bin/core/wasm/* _site/demo/core/latest/
+          cp -R bin/bitwig/wasm/* _site/demo/bitwig/latest/
+          touch _site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

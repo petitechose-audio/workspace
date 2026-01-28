@@ -44,9 +44,16 @@
 - 2026-01-28:
   - Fixed Fedora CI type-check by installing `libatomic` (required by the bundled Node used by pyright).
 
+- 2026-01-28:
+  - Adjusted Full Builds matrix:
+    - Native builds on all OS targets (Windows/macOS/Linux).
+    - WASM builds only on Ubuntu.
+    - Added Bitwig simulator builds (native everywhere, wasm on Ubuntu).
+
 ## Decisions
 
 - Keep CI fast: validate ms package (tests + typing) on all OS targets; don't auto-install heavy toolchains (emsdk) in the smoke job.
+- Full Builds is allowed to be heavier; it should reflect real developer workflows (clone repos + toolchains + builds).
 
 ## Plan deviations
 
