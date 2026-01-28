@@ -7,8 +7,8 @@ Every step is designed to be small, testable, and traceable.
 
 - CLI Phase 6 is done (verb-based `ms` surface).
 - CI smoke is green.
-- Full Builds is green (baseline run):
-  - https://github.com/petitechose-audio/workspace/actions/runs/21435915307
+- Full Builds is green (including Pages deploy):
+  - https://github.com/petitechose-audio/workspace/actions/runs/21448140321
 
 - Repo is public.
 - GitHub Pages is enabled (source: GitHub Actions).
@@ -57,7 +57,7 @@ gh run view <run-id> --log-failed
 
 ### 1.3 Close Phase 7
 
-When the new matrix is green:
+When the new matrix is green (done):
 
 - Mark `docs/memories/work/refactor-all-dev-cli-dx-max/phase-7-ci-matrix.md` as `completed`
 - Update `docs/memories/work/refactor-all-dev-cli-dx-max/STATUS.md` to `Phase 7 (ci matrix): completed`
@@ -100,7 +100,7 @@ Add tracked HTML pages that:
 
 ### 2.4 Verification
 
-- Run the Pages workflow and confirm the deployed URLs respond.
+- Run the Pages deploy and confirm the deployed URLs respond (done).
 - Manual validation (real browser):
   - open `/demo/core/latest/` and `/demo/bitwig/latest/`
   - verify UI loads

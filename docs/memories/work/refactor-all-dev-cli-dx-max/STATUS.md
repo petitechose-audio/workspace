@@ -21,10 +21,17 @@
 - Phase 5 (macos without brew): completed
 - Phase 5a (type-safety contract): completed
 - Phase 6 (cli unified verbs): completed
-- Phase 7 (ci matrix): started
-- Phase 8 (web demos): started
+- Phase 7 (ci matrix): completed
+- Phase 8 (web demos): completed
 
 ## Latest verification
+
+- 2026-01-28 (ci):
+  - Full Builds green (native all OS + wasm ubuntu + Pages deploy):
+    - https://github.com/petitechose-audio/workspace/actions/runs/21448140321
+  - Pages demo URLs:
+    - https://petitechose-audio.github.io/workspace/demo/core/latest/
+    - https://petitechose-audio.github.io/workspace/demo/bitwig/latest/
 
 - 2026-01-27 (windows, phase-6):
   - `uv run ms --help` ok (no legacy core/bitwig commands)

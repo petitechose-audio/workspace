@@ -1,7 +1,7 @@
 # Phase 8: Web demos (GitHub Pages + local bridge)
 
 **Scope**: publish static WASM demos for `core` and `bitwig`
-**Status**: started
+**Status**: completed
 **Created**: 2026-01-28
 **Updated**: 2026-01-28
 
@@ -88,6 +88,11 @@ Note: repository migration will change the base URL.
   - Repo is public and GitHub Pages is enabled (source: GitHub Actions).
   - Added tracked demo site skeleton under `site/demo/`.
   - Added Pages deploy job (publishes `/demo/core/latest/` + `/demo/bitwig/latest/`).
+
+- 2026-01-28:
+  - Demo site deployed and reachable:
+    - https://petitechose-audio.github.io/workspace/demo/core/latest/
+    - https://petitechose-audio.github.io/workspace/demo/bitwig/latest/
 
 ## Sources
 

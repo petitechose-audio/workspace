@@ -1,7 +1,7 @@
 # Phase 7: CI matrix (multi-platform validation)
 
 **Scope**: CI + smoke tests
-**Status**: started
+**Status**: completed
 **Created**: 2026-01-27
 **Updated**: 2026-01-28
 
@@ -52,6 +52,10 @@
   - Added a Pages deploy job to publish the demo site artifacts.
   - Fixed Pages deploy to use deterministic artifact paths and validate expected WASM outputs.
 
+- 2026-01-28:
+  - Full Builds validated green (including Pages deploy):
+    - https://github.com/petitechose-audio/workspace/actions/runs/21448140321
+
 ## Decisions
 
 - Keep CI fast: validate ms package (tests + typing) on all OS targets; don't auto-install heavy toolchains (emsdk) in the smoke job.
@@ -64,6 +68,9 @@
 ## Verification (minimum)
 
 - CI green on all OS targets.
+- Pages demo URLs respond:
+  - https://petitechose-audio.github.io/workspace/demo/core/latest/
+  - https://petitechose-audio.github.io/workspace/demo/bitwig/latest/
 
 ## Sources
 
