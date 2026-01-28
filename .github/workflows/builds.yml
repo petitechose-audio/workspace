@@ -73,6 +73,16 @@ jobs:
         if: ${{ matrix.build_wasm }}
         run: uv run ms build bitwig --target wasm
 
+      - name: Verify WASM outputs
+        if: ${{ matrix.build_wasm }}
+        run: |
+          ls -la bin/core || true
+          ls -la bin/core/wasm || true
+          ls -la bin/bitwig || true
+          ls -la bin/bitwig/wasm || true
+          test -f bin/core/wasm/midi_studio_core.html
+          test -f bin/bitwig/wasm/midi_studio_bitwig.html
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -145,17 +155,40 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bin-Linux
+          path: _artifacts
 
       - name: Prepare site
         run: |
+          set -euo pipefail
+
           rm -rf _site
           mkdir -p _site
           cp -R site/* _site/
-          # WASM artifacts from the ubuntu build job
+
+          # WASM artifacts from the ubuntu build job.
+          # download-artifact layout can vary; prefer a deterministic path.
+          BIN_ROOT="_artifacts"
+          if [ -d "_artifacts/bin" ]; then
+            BIN_ROOT="_artifacts/bin"
+          fi
+
+          if [ ! -d "${BIN_ROOT}/core/wasm" ]; then
+            echo "Expected WASM output not found: ${BIN_ROOT}/core/wasm" >&2
+            ls -la "${BIN_ROOT}" || true
+            ls -la "${BIN_ROOT}/core" || true
+            exit 1
+          fi
+
+          if [ ! -d "${BIN_ROOT}/bitwig/wasm" ]; then
+            echo "Expected WASM output not found: ${BIN_ROOT}/bitwig/wasm" >&2
+            ls -la "${BIN_ROOT}/bitwig" || true
+            exit 1
+          fi
+
           mkdir -p _site/demo/core/latest
           mkdir -p _site/demo/bitwig/latest
-          cp -R bin/core/wasm/* _site/demo/core/latest/
-          cp -R bin/bitwig/wasm/* _site/demo/bitwig/latest/
+          cp -R "${BIN_ROOT}/core/wasm/"* _site/demo/core/latest/
+          cp -R "${BIN_ROOT}/bitwig/wasm/"* _site/demo/bitwig/latest/
           touch _site/.nojekyll
 
       - name: Upload Pages artifact
