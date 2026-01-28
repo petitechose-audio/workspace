@@ -53,6 +53,15 @@ Preferred (API via `gh api`):
 gh api -X POST repos/petitechose-audio/workspace/transfer -f new_owner=midi-studio
 ```
 
+If this fails with a 422 like:
+
+- "You don’t have the permission to create public repositories on midi-studio"
+
+Then an org owner must either:
+
+- perform the transfer from the GitHub web UI using an owner account, or
+- grant the initiating account permission to create public repositories in the org.
+
 Notes:
 
 - GitHub may require an org owner to accept the transfer.
@@ -107,3 +116,6 @@ git clone https://github.com/midi-studio/ms-dev-env.git
 - 2026-01-28:
   - Repository set to public.
   - GitHub Pages enabled (source: GitHub Actions).
+
+- 2026-01-28:
+  - Transfer attempt via API failed (HTTP 422): missing permission to create public repositories in `midi-studio`.
