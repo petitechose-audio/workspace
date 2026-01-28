@@ -216,7 +216,7 @@ class TestJdkToolBinPath:
 
         path = tool.bin_path(Path("/tools"), Platform.MACOS)
 
-        assert path == Path("/tools/jdk/bin/java")
+        assert path == Path("/tools/jdk/Contents/Home/bin/java")
 
     def test_windows(self) -> None:
         """Binary path on Windows includes .exe."""
@@ -240,6 +240,16 @@ class TestJdkToolInstallation:
         (bin_dir / "java").touch()
 
         assert tool.is_installed(tmp_path, Platform.LINUX) is True
+
+    def test_is_installed_true_macos(self, tmp_path: Path) -> None:
+        """JdkTool is installed on macOS bundle layout."""
+        tool = JdkTool()
+
+        bin_dir = tmp_path / "jdk" / "Contents" / "Home" / "bin"
+        bin_dir.mkdir(parents=True)
+        (bin_dir / "java").touch()
+
+        assert tool.is_installed(tmp_path, Platform.MACOS) is True
 
     def test_is_installed_false(self, tmp_path: Path) -> None:
         """JdkTool is not installed if binary doesn't exist."""
@@ -267,6 +277,21 @@ class TestJdkToolInstallation:
         assert java.stat().st_mode & 0o111  # At least one execute bit
         assert javac.stat().st_mode & 0o111
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="chmod doesn't work on Windows")
+    def test_post_install_macos_bundle_layout(self, tmp_path: Path) -> None:
+        """Post-install on macOS supports the Contents/Home layout."""
+        tool = JdkTool()
+
+        bin_dir = tmp_path / "Contents" / "Home" / "bin"
+        bin_dir.mkdir(parents=True)
+        java = bin_dir / "java"
+        java.touch()
+        java.chmod(0o644)
+
+        tool.post_install(tmp_path, Platform.MACOS)
+
+        assert java.stat().st_mode & 0o111
+
     def test_post_install_windows(self, tmp_path: Path) -> None:
         """Post-install on Windows doesn't fail."""
         tool = JdkTool()
@@ -289,3 +314,12 @@ class TestJdkToolJavaHome:
         path = tool.java_home(Path("/tools"))
 
         assert path == Path("/tools/jdk")
+
+    def test_java_home_macos_bundle_layout(self, tmp_path: Path) -> None:
+        """java_home returns Contents/Home when present (macOS bundle layout)."""
+        tool = JdkTool()
+
+        home = tmp_path / "jdk" / "Contents" / "Home"
+        home.mkdir(parents=True)
+
+        assert tool.java_home(tmp_path) == home

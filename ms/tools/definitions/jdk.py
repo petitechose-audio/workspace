@@ -120,14 +120,35 @@ class JdkTool(Tool):
         """JDK archives have a root directory to strip."""
         return 1
 
+    def _java_home_dir(self, tools_dir: Path) -> Path:
+        """Resolve JAVA_HOME for the extracted JDK layout.
+
+        On macOS, Adoptium JDK archives typically contain a .jdk bundle layout:
+        jdk/Contents/Home/bin/java
+
+        On Linux/Windows, the expected layout is:
+        jdk/bin/java
+        """
+        macos_home = tools_dir / "jdk" / "Contents" / "Home"
+        if macos_home.is_dir():
+            return macos_home
+        return tools_dir / "jdk"
+
     def bin_path(self, tools_dir: Path, platform: Platform) -> Path | None:
         """JDK binary is in bin/java under the jdk/ directory."""
+        if platform.is_macos:
+            return tools_dir / "jdk" / "Contents" / "Home" / "bin" / platform.exe_name("java")
         return tools_dir / "jdk" / "bin" / platform.exe_name("java")
 
     def post_install(self, install_dir: Path, platform: Platform) -> None:
         """Make binaries executable on Unix."""
         if platform.is_unix:
+            # JDK layout differs on macOS (Contents/Home/bin).
             bin_dir = install_dir / "bin"
+            if platform.is_macos:
+                macos_bin = install_dir / "Contents" / "Home" / "bin"
+                if macos_bin.is_dir():
+                    bin_dir = macos_bin
             if bin_dir.exists():
                 for binary in bin_dir.iterdir():
                     if binary.is_file():
@@ -138,4 +159,4 @@ class JdkTool(Tool):
 
         This is used by shell activation scripts to set JAVA_HOME.
         """
-        return tools_dir / "jdk"
+        return self._java_home_dir(tools_dir)
