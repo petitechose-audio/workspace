@@ -20,7 +20,7 @@ def setup(
     install_cli: bool = typer.Option(
         False,
         "--install-cli",
-        help="Install ms/oc-* globally via `uv tool`",
+        help="Install ms/oc-* globally via `uv tool` (editable)",
     ),
     update_shell: bool = typer.Option(
         False,
@@ -84,7 +84,7 @@ def setup(
                     ctx.console.success(f"default workspace set: {ctx.workspace.root}")
 
             if install_cli:
-                cmd = ["uv", "tool", "install", str(ctx.workspace.root)]
+                cmd = ["uv", "tool", "install", "-e", str(ctx.workspace.root)]
                 ctx.console.print(" ".join(cmd), Style.DIM)
                 if not dry_run:
                     ires = run_silent(cmd, cwd=ctx.workspace.root)

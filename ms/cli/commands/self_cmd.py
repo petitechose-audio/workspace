@@ -76,10 +76,9 @@ def _resolve_tool_name(*, override: str | None) -> tuple[str, str]:
 @self_app.command("install")
 def install(
     editable: bool = typer.Option(
-        False,
-        "--editable",
-        "-e",
-        help="Install in editable mode (dev workflow)",
+        True,
+        "--editable/--no-editable",
+        help="Install in editable mode (recommended for dev workflow)",
     ),
     update_shell: bool = typer.Option(
         False,

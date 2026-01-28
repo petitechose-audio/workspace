@@ -53,9 +53,9 @@ def test_self_install_runs_uv_tool_install(tmp_path: Path, monkeypatch: pytest.M
         self_cmd, "remember_default_workspace_root", fake_remember_default_workspace_root
     )
 
-    self_cmd.install(editable=False, update_shell=False, remember_workspace=True, dry_run=False)
+    self_cmd.install(editable=True, update_shell=False, remember_workspace=True, dry_run=False)
 
-    assert seen["cmd"] == ["uv", "tool", "install", str(ws)]
+    assert seen["cmd"] == ["uv", "tool", "install", "-e", str(ws)]
     assert seen["cwd"] == ws
 
 
