@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import subprocess
 import os
+import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from ms.oc_cli.common import detect_env
 from ms.core.result import Err, Ok, Result
 from ms.output.console import Style
 from ms.services.base import BaseService
@@ -47,7 +49,12 @@ class HardwareService(BaseService):
         if not app.has_teensy:
             return Err(HardwareError("no_platformio", f"no platformio.ini in {app.path}"))
 
-        return self._run_oc("oc_build", app.path, "build", env=env, dry_run=dry_run)
+        env_name = detect_env(app.path, env)
+        result = self._run_oc("oc_build", app.path, "build", env=env_name, dry_run=dry_run)
+        if isinstance(result, Err) or dry_run:
+            return result
+
+        return self._export_firmware(app.path, app_name=app.name, env_name=env_name)
 
     def upload(
         self,
@@ -60,7 +67,12 @@ class HardwareService(BaseService):
         if not app.has_teensy:
             return Err(HardwareError("no_platformio", f"no platformio.ini in {app.path}"))
 
-        return self._run_oc("oc_upload", app.path, "upload", env=env, dry_run=dry_run)
+        env_name = detect_env(app.path, env)
+        result = self._run_oc("oc_upload", app.path, "upload", env=env_name, dry_run=dry_run)
+        if isinstance(result, Err) or dry_run:
+            return result
+
+        return self._export_firmware(app.path, app_name=app.name, env_name=env_name)
 
     def monitor(self, app: App, *, env: str | None = None) -> int:
         """Build, upload, and monitor using oc-monitor."""
@@ -136,3 +148,26 @@ class HardwareService(BaseService):
                 f"{action} failed with code {result.returncode}",
             )
         )
+
+    def _export_firmware(
+        self, app_root: Path, *, app_name: str, env_name: str
+    ) -> Result[None, HardwareError]:
+        """Copy firmware.hex into bin/<app>/teensy/<env>/firmware.hex."""
+        fw = app_root / ".pio" / "build" / env_name / "firmware.hex"
+        if not fw.exists():
+            return Err(
+                HardwareError(
+                    "build_failed",
+                    f"firmware output missing: {fw}",
+                    hint=f"Run: uv run ms build {app_name} --target teensy --env {env_name}",
+                )
+            )
+
+        dst_dir = self._workspace.bin_dir / app_name / "teensy" / env_name
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy2(fw, dst_dir / "firmware.hex")
+        except OSError as e:
+            return Err(HardwareError("build_failed", f"failed to export firmware: {e}"))
+
+        return Ok(None)

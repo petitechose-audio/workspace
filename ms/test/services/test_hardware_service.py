@@ -24,6 +24,10 @@ def test_hardware_build_invokes_oc_build_module(
     ws = Workspace(root=tmp_path)
     app_dir = tmp_path / "midi-studio" / "core"
     app_dir.mkdir(parents=True)
+    (app_dir / "platformio.ini").write_text("[platformio]\ndefault_envs = dev\n", encoding="utf-8")
+    fw = app_dir / ".pio" / "build" / "dev" / "firmware.hex"
+    fw.parent.mkdir(parents=True)
+    fw.write_bytes(b"deadbeef")
     app = App(name="core", path=app_dir, has_teensy=True)
 
     seen: dict[str, object] = {}
@@ -62,6 +66,7 @@ def test_hardware_build_dry_run_skips_subprocess(
     ws = Workspace(root=tmp_path)
     app_dir = tmp_path / "midi-studio" / "core"
     app_dir.mkdir(parents=True)
+    (app_dir / "platformio.ini").write_text("[platformio]\ndefault_envs = dev\n", encoding="utf-8")
     app = App(name="core", path=app_dir, has_teensy=True)
 
     called = {"n": 0}
