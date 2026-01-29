@@ -99,3 +99,10 @@ name = "plugin-bitwig"
 url = "https://github.com/petitechose-midi-studio/plugin-bitwig"
 path = "midi-studio/plugin-bitwig"
 branch = "main"
+
+[[repos]]
+org = "petitechose-midi-studio"
+name = "loader"
+url = "https://github.com/petitechose-midi-studio/loader"
+path = "midi-studio/loader"
+branch = "main"
