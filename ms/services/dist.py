@@ -54,7 +54,10 @@ def _sha256_file(path: Path) -> str:
 
 def _zip_files(zip_path: Path, *, files: list[tuple[Path, str]]) -> None:
     zip_path.parent.mkdir(parents=True, exist_ok=True)
-    with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zf:
+    # Some CI environments ship tool files with mtime=0 (Unix epoch). The ZIP
+    # format cannot represent timestamps before 1980, and Python defaults to
+    # strict timestamp validation.
+    with ZipFile(zip_path, "w", compression=ZIP_DEFLATED, strict_timestamps=False) as zf:
         for src, arc in files:
             zf.write(src, arcname=arc)
 
