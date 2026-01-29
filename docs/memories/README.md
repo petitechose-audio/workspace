@@ -9,6 +9,7 @@ memories/
 ├── global/              # Documentation cross-project
 ├── open-control/        # Framework & tools
 ├── midi-studio/         # Produit
+├── setup-architecture/   # Setup + distribution architecture
 ├── work/                # Travaux en cours
 └── _OLD/                # Archives
 ```
@@ -92,6 +93,7 @@ _OLD/2026-01-17-refactor-oc-naming.md
 ### work/ (travaux en cours)
 | Fichier | Status | Description |
 |---------|--------|-------------|
-| `feature-ms-preset-storage/` | planned | Système de presets avec persistence (dossier multi-phase) |
+| `feature-ms-preset-storage/` | in progress | Système de presets avec persistence (dossier multi-phase) |
 | `feature-ms-sequencer/` | planned | Step Sequencer modulaire (dossier multi-phase) |
-| `refactor-all-dev-cli-dx-max/` | planned | Refactor setup + ms CLI pour DX maximale |
+| `refactor-all-dev-cli-dx-max/` | completed | Refactor setup + ms CLI pour DX maximale |
+| `feature-all-distribution-installer/` | planned | Nightly/release channels + manifest + installer end-user |

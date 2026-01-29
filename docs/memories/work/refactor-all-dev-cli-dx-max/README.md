@@ -1,9 +1,9 @@
 # Refactor: Dev CLI DX Max (Deshellize + Bootstrap)
 
 **Scope**: all (ms + open-control + midi-studio orchestration)
-**Status**: started
+**Status**: completed
 **Created**: 2026-01-27
-**Updated**: 2026-01-28
+**Updated**: 2026-01-29
 
 ## Objectif
 
@@ -41,13 +41,11 @@ Construire une CLI `ms`:
   - activation d'environnement (set PATH/env dans le shell courant)
   - wrappers auto-generes si on veut une ergonomie terminal (optionnel, pas requis pour les commandes `ms`)
 
-## Etat actuel (points bloquants)
+## Etat actuel (2026-01-29)
 
-- Hardware: supprimer toute dependance a bash (oc-* doit etre en Python et runnable via `uv`/`uv tool`).
-- `ms/services/repos.py` depend de `gh` et d'auth GH.
-- `ms/services/bridge.py` depend de Rust/cargo et d'un linker C.
-- `ms/services/checkers/system.py` impose Homebrew sur macOS.
-- hints/erreurs pointent vers des commandes inexistantes (`ms tools sync`, `ms repos sync`, etc.)
+Phases 1-8 sont complétées (voir `docs/memories/work/refactor-all-dev-cli-dx-max/STATUS.md`).
+
+Suite du programme (distribution/installer): `docs/memories/work/feature-all-distribution-installer/README.md`
 
 ## Roadmap de migration (bottom-up, commits atomiques)
 

@@ -1,9 +1,9 @@
 # Refactor: Dev CLI DX Max - Status
 
 **Scope**: all
-**Status**: started
+**Status**: completed
 **Created**: 2026-01-27
-**Updated**: 2026-01-28
+**Updated**: 2026-01-29
 
 ## Goal
 
@@ -69,3 +69,5 @@
 - Any deviation from the plan must be documented in the relevant phase file under "Plan deviations".
 
 - Repo migration plan: `docs/memories/work/refactor-all-dev-cli-dx-max/repo-migration.md`
+
+- Next work (distribution/installer): `docs/memories/work/feature-all-distribution-installer/README.md`

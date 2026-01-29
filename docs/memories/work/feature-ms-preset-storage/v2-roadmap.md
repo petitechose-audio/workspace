@@ -21,7 +21,7 @@ V2 **étend** V1 sans la casser. Les interfaces V1 restent stables.
 ```
 V1 (inchangé):
 ┌─────────────────────────────────────────────────────────┐
-│  PresetManager → Settings<PresetData> → IStorageBackend │
+│  PresetManager → Settings<PresetData> → oc::interface::IStorage │
 └─────────────────────────────────────────────────────────┘
 
 V2 (extension):
@@ -46,7 +46,7 @@ V2 (extension):
 | Feature | Description | Effort | Dépendances |
 |---------|-------------|--------|-------------|
 | Multi-presets | Slots 1-99, sauvegarde/chargement | 6-8h | V1 |
-| LittleFSPresetBank | Multi-presets sur LittleFS | 3-4h | Multi-presets |
+| LittleFSPresetBank | (Optionnel) Multi-presets sur LittleFS | 3-4h | Multi-presets |
 | Bridge HTTP | Routes REST pour WASM | 4-6h | V1 WASM |
 | Sync Teensy↔Desktop | Transfert via USB/Serial | 6-8h | Bridge HTTP |
 | Noms personnalisés | Nommer les presets | 2-3h | Multi-presets |
@@ -54,7 +54,9 @@ V2 (extension):
 
 **Total estimé** : 30-40h
 
-> **Note** : LittleFS single-file storage est en V1 (validé 2026-01-19). V2 ajoute uniquement la gestion multi-presets sur LittleFS.
+> **Note (2026-01-29)** : LittleFS persistence a été validée (2026-01-19), mais la direction actuelle
+> côté Teensy privilégie la SD card (SDIO) pour éviter les stalls FlexSPI. La partie LittleFS ci-dessous
+> est conservée comme option/expérimentation.
 
 ---
 
@@ -240,13 +242,13 @@ Test effectué dans `midi-studio/tests/littlefs-persistence/` :
 - 7424KB de flash persistant disponible
 - Code < 512KB requis (test: ~60KB)
 
-**Note** : V1 utilise déjà LittleFSBackend pour single-file storage.
-V2 étend avec LittleFSPresetBank pour multi-presets (fichiers séparés par slot).
+**Note** : Côté Teensy, V1 privilégie la SD card (SDIO) pour la persistence non-bloquante.
+LittleFSPresetBank reste une option si on veut explorer LittleFS en multi-presets.
 
 ### Implémentation LittleFSPresetBank
 
 ```cpp
-// hal-teensy/src/oc/hal/teensy/LittleFSPresetBank.hpp
+// open-control/hal-teensy/src/oc/hal/teensy/LittleFSPresetBank.hpp
 
 #include <LittleFS.h>
 
@@ -522,7 +524,7 @@ V1 stable
     │
     ├──► Multi-presets (FilePresetBank) ──► Noms personnalisés
     │
-    ├──► LittleFS Teensy (après test hardware)
+    ├──► Teensy bank (SD card preferred; LittleFS optional)
     │
     └──► Bridge HTTP ──► HttpPresetBank ──► Sync Teensy↔Desktop
                     │
@@ -533,7 +535,7 @@ V1 stable
 
 ## Règles de rétrocompatibilité
 
-1. **Interfaces V1 stables** : `IStorageBackend`, `Settings<T>`, `PresetData`
+1. **Interfaces V1 stables** : `oc::interface::IStorage`, `Settings<T>`, `PresetData`
 2. **Méthodes additives** : Nouvelles méthodes avec défaut ou nullable
 3. **Champs à la fin** : Nouveaux champs de struct ajoutés à la fin
 4. **Magic numbers distincts** : V1 `OCST`, V2 presets `MSP2`

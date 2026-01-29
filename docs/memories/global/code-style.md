@@ -312,5 +312,5 @@ Views → subscribe to State (automatic UI updates)
 
 ## Voir aussi
 
-- `midi-studio/overview.md` - Structure des projets
+- `docs/memories/midi-studio/overview.md` - Structure des projets
 - `midi-studio/core/docs/` - Guides HOW_TO_* détaillés

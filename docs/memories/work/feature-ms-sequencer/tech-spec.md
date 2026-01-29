@@ -2,8 +2,8 @@
 title: 'Step Sequencer Modulaire'
 slug: 'step-sequencer'
 created: '2026-01-07'
-status: 'in-progress'
-stepsCompleted: [1]
+status: 'planned'
+stepsCompleted: []
 tech_stack:
   - C++17
   - LVGL 9.4.0
@@ -24,6 +24,8 @@ test_patterns:
 # Tech-Spec: Step Sequencer Modulaire
 
 **Created:** 2026-01-07
+
+**Status (2026-01-29):** planned. No implementation work is scheduled until the dev environment distribution (nightly/release + installer) is solid.
 
 ## Overview
 
@@ -53,7 +55,7 @@ Créer un nouveau repo `open-control/note/` contenant la logique pure du séquen
 - Résolution 24 PPQN
 - Voice limiter global (settings)
 - MIDI Learn (mode record + per-step)
-- **Storage** : LittleFS 6MB sur Flash, format JSON
+- **Storage** : SD card (Teensy, SDIO) + file (desktop). Format TBD (JSON draft).
 - **GUI Manager PC** : Web GUI (localhost:9001) - in scope v1 mais pas prioritaire
 - **Protocol FILE_*** : Commandes transfert fichiers via oc-bridge (chunking Binary)
 
@@ -72,12 +74,12 @@ Le séquenceur est un **mode exclusif** par rapport au mode Macro :
 - **Mode Macro** : Comportement actuel (8 encodeurs = 8 macros CC)
 - **Mode Sequencer** : Les 8 encodeurs contrôlent les 8 steps visibles
 
-Un seul mode actif à la fois. Switch via **LEFT_TOP** → Mode Selector (voir `navigation-patterns` memory).
+Un seul mode actif à la fois. Switch via **LEFT_TOP** → Mode Selector (voir `docs/memories/midi-studio/hw-navigation.md`).
 
 ## Interactions Hardware
 
-> **Référence :** Voir mémoire `navigation-patterns` pour les patterns universels MIDI Studio.
-> **Référence :** Voir mémoire `hardware-layout-reference` pour le schéma physique et IDs.
+> **Référence :** Voir `docs/memories/midi-studio/hw-navigation.md` pour les patterns universels MIDI Studio.
+> **Référence :** Voir `docs/memories/midi-studio/hw-layout.md` pour le schéma physique et IDs.
 
 ### Mapping Mode Sequencer (Vue Principale)
 
@@ -93,7 +95,7 @@ Un seul mode actif à la fois. Switch via **LEFT_TOP** → Mode Selector (voir `
 | **BOTTOM_CENTER** | Play/Pause | Stop | — |
 | **BOTTOM_RIGHT** | Page ► | Paste step | — |
 
-> **Référence complète :** Voir mémoire `sequencer-overlay-mappings` pour tous les overlays.
+> **Référence complète :** Voir `docs/memories/midi-studio/hw-sequencer.md` pour les overlays.
 
 ### Structure Overlays Séquenceur
 
@@ -211,7 +213,7 @@ uint32_t calculateTriggerTick(uint8_t stepIndex, float timeOffset, uint32_t tick
 | **RAM1 (DTCM)** | 512 KB | Code temps-réel, stack, variables critiques |
 | **RAM2 (OCRAM)** | 512 KB | Framebuffer LVGL, DMA buffers |
 | **PSRAM** | 8 MB | SequencerState runtime, Undo history |
-| **LittleFS (Flash)** | 6 MB | Persistence : séquences, presets, settings |
+| **SD card (SDIO)** | (varies) | Persistence : séquences, presets, settings |
 
 ### Répartition Séquenceur
 
@@ -228,63 +230,59 @@ struct SequencerRuntime {
 };
 SequencerRuntime runtime;  // ~1 KB
 
-// LittleFS : Persistence (non-volatile)
-// /sequences/*.json
-// /presets/fx/*.json
-// /presets/chains/*.json
-// /settings/global.json
+// SD card : Persistence (non-volatile)
+// /midi-studio/sequences/*.json
+// /midi-studio/presets/fx/*.json
+// /midi-studio/presets/chains/*.json
+// /midi-studio/settings/global.json
 ```
 
 ### Flow Mémoire
 
 ```
-Boot → LittleFS → PSRAM (load)
+Boot → SD card → PSRAM (load)
 Edit → PSRAM (runtime)
-Save → PSRAM → LittleFS (persist)
+Save → PSRAM → SD card (persist)
 Tick → PSRAM → RAM1 (prepareNextTick) → Output
 ```
 
-## Persistence (LittleFS)
+## Persistence (SD card)
 
-### Configuration Flash
+### Rationale
 
-```
-Teensy 4.1 Flash (8 MB)
-├── Firmware (0x00000000) : ~2 MB (partie basse)
-└── LittleFS (partie haute) : ~6 MB ← PRÉSERVÉ à l'upload ✅
-```
+- The current core firmware already uses SD card storage via SDIO (non-blocking) for persistence.
+- LittleFS persistence was explored historically, but it is not the current direction for the product.
 
-**Important :** Utiliser `LittleFS_Program` (pas `LittleFS_SPIFlash`) pour que la partition survive aux uploads firmware.
-
-**Note :** À vérifier empiriquement sur Teensy 4.1. D'après le forum PJRC, la partition haute (6MB) devrait être préservée si le firmware ne déborde pas (~2MB max).
-
-### Premier Boot
+### First boot / init (Teensy)
 
 ```cpp
-#include <LittleFS.h>
+#include <SD.h>
 
-LittleFS_Program myfs;
+// Teensy 4.1 built-in SDIO
+static constexpr int SD_CS = BUILTIN_SDCARD;
 
-void initFilesystem() {
-    // Tente de monter LittleFS (6MB dans la partie haute)
-    if (!myfs.begin(6 * 1024 * 1024)) {
-        // Premier boot : formater et créer structure
-        myfs.format();
-        myfs.begin(6 * 1024 * 1024);
-
-        // Créer arborescence
-        myfs.mkdir("/sequences");
-        myfs.mkdir("/presets");
-        myfs.mkdir("/presets/fx");
-        myfs.mkdir("/presets/chains");
-        myfs.mkdir("/settings");
-
-        // Générer presets de base
-        createDefaultPresets();
-        createDefaultSettings();
+bool initStorage() {
+    if (!SD.begin(SD_CS)) {
+        return false;
     }
+
+    // Create directory structure (best-effort)
+    if (!SD.exists("/midi-studio")) SD.mkdir("/midi-studio");
+    if (!SD.exists("/midi-studio/sequences")) SD.mkdir("/midi-studio/sequences");
+    if (!SD.exists("/midi-studio/presets")) SD.mkdir("/midi-studio/presets");
+    if (!SD.exists("/midi-studio/presets/fx")) SD.mkdir("/midi-studio/presets/fx");
+    if (!SD.exists("/midi-studio/presets/chains")) SD.mkdir("/midi-studio/presets/chains");
+    if (!SD.exists("/midi-studio/settings")) SD.mkdir("/midi-studio/settings");
+    if (!SD.exists("/midi-studio/backup")) SD.mkdir("/midi-studio/backup");
+
+    return true;
 }
 ```
+
+### Performance notes
+
+- Debounce auto-save writes; keep the UI loop deterministic.
+- Prefer atomic replace (write `*.tmp`, then rename) to reduce corruption risk.
 
 ### Presets de Base (générés en code)
 
@@ -293,19 +291,19 @@ Au premier boot, le firmware génère les presets de base :
 ```cpp
 void createDefaultPresets() {
     // FX Presets
-    writeJsonIfNotExists("/presets/fx/ratchet_x2.json",
+    writeJsonIfNotExists("/midi-studio/presets/fx/ratchet_x2.json",
         R"({"type":"ratchet","divisions":2,"decay":0})");
-    writeJsonIfNotExists("/presets/fx/ratchet_x4.json",
+    writeJsonIfNotExists("/midi-studio/presets/fx/ratchet_x4.json",
         R"({"type":"ratchet","divisions":4,"decay":0.2})");
-    writeJsonIfNotExists("/presets/fx/swing_medium.json",
+    writeJsonIfNotExists("/midi-studio/presets/fx/swing_medium.json",
         R"({"type":"swing","amount":0.33})");
-    writeJsonIfNotExists("/presets/fx/humanize_subtle.json",
+    writeJsonIfNotExists("/midi-studio/presets/fx/humanize_subtle.json",
         R"({"type":"humanize","velocity":0.05,"timing":0.03})");
     // ... autres presets
 }
 
 void createDefaultSettings() {
-    writeJsonIfNotExists("/settings/global.json",
+    writeJsonIfNotExists("/midi-studio/settings/global.json",
         R"({"voiceLimit":16,"defaultBpm":120})");
 }
 ```
@@ -371,10 +369,10 @@ void createDefaultSettings() {
 
 ### Comportement Contextes
 
-- **Standalone** : État chargé depuis LittleFS au boot → PSRAM
+- **Standalone** : État chargé depuis SD card au boot → PSRAM
 - **Bitwig** : Même état, Bitwig y accède via Protocol
 - **Arrêt Bitwig** : Séquenceur continue avec son état PSRAM
-- **Save** : PSRAM → LittleFS (auto-save ou manuel)
+- **Save** : PSRAM → SD card (auto-save ou manuel)
 
 ## GUI Manager (PC)
 
@@ -540,12 +538,12 @@ struct INoteFX {
 
 ### Memory References
 
-| Memory | Purpose |
-| ------ | ------- |
-| `hardware-layout-reference` | Schéma physique contrôleur, IDs boutons/encodeurs |
-| `hardware-mapping-template` | Template pour définir mappings par écran/overlay |
-| `navigation-patterns` | **Patterns navigation universels** (LEFT_TOP=escape, NAV=confirm, OPT=fine tune, breadcrumb) |
-| `sequencer-overlay-mappings` | **Mappings complets séquenceur** (12 overlays, tous contrôles, pagination, modifiers) |
+| Doc | Purpose |
+| --- | ------- |
+| `docs/memories/midi-studio/hw-layout.md` | Schéma physique contrôleur, IDs boutons/encodeurs |
+| `docs/memories/midi-studio/hw-mapping-template.md` | Template pour définir mappings par écran/overlay |
+| `docs/memories/midi-studio/hw-navigation.md` | Patterns navigation universels (LEFT_TOP escape, NAV confirm, OPT fine tune) |
+| `docs/memories/midi-studio/hw-sequencer.md` | Mappings séquenceur (overlays, pagination, modifiers) |
 
 ### Technical Decisions
 
@@ -785,12 +783,12 @@ enum class FXType : uint8_t {
 
 ### Notes
 
-**Questions résolues (voir `sequencer-overlay-mappings`) :**
+**Questions résolues (voir `docs/memories/midi-studio/hw-sequencer.md`) :**
 - ✅ Sélectionner une track → NAV turn (1-16)
 - ✅ Mute/Solo → Track Config (MACRO 3/4)
 - ✅ Switch Macro ↔ Sequencer → LEFT_TOP → Mode Selector
 - ✅ Définir longueur → Pattern Config → Length
-- ✅ Navigation overlays → Documentée dans `sequencer-overlay-mappings`
+- ✅ Navigation overlays → Documentée dans `docs/memories/midi-studio/hw-sequencer.md`
 
 **Évolutions futures identifiées :**
 - Modes arpeggiator additionnels

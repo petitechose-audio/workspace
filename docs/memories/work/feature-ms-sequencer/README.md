@@ -11,7 +11,10 @@ Séquenceur à pas multi-track (16 pistes) avec:
 - 7 Step Properties: Note, Velocity, Gate, Probability, TimeOffset, Slide, Accent
 - Track FX Chain: Ratchet, Chord, Scale Quantize, Humanize, Swing, etc.
 - Mode exclusif vs Mode Macro (switch via LEFT_TOP)
-- Storage LittleFS 6MB (JSON)
+- Storage (planned): align with current storage direction
+  - Teensy: SD card (non-blocking SDIO)
+  - Desktop: file-based
+  - WASM: no persistence yet (future via bridge)
 
 ## Architecture
 
@@ -40,6 +43,6 @@ midi-studio/plugin-bitwig/   # Intégration Bitwig
 
 ## Voir aussi
 
-- `midi-studio/hw-layout.md` - Hardware IDs
-- `midi-studio/hw-navigation.md` - Patterns de navigation
-- `midi-studio/hw-sequencer.md` - Mappings séquenceur (overlay)
+- `docs/memories/midi-studio/hw-layout.md` - Hardware IDs
+- `docs/memories/midi-studio/hw-navigation.md` - Patterns de navigation
+- `docs/memories/midi-studio/hw-sequencer.md` - Mappings séquenceur (overlay)

@@ -73,4 +73,4 @@ find "$WS" -name "*.hpp" -mtime -1 | grep -v .pio | grep -v .git
 
 ## Voir aussi
 
-- `midi-studio/overview.md` - Structure des projets et chemins clés
+- `docs/memories/midi-studio/overview.md` - Structure des projets et chemins clés

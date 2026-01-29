@@ -186,7 +186,7 @@ MacroPagePreset importFile(const char* path) {
 ```cpp
 class PresetStore {
 public:
-    explicit PresetStore(IStorageBackend& backend);
+    explicit PresetStore(oc::interface::IStorage& backend);
 
     // ═══════════════════════════════════════════════════════════════
     // Storage interne (POD binaire)
@@ -216,7 +216,7 @@ public:
     std::optional<T> importFile(const char* path);
 
 private:
-    IStorageBackend& backend_;
+    oc::interface::IStorage& backend_;
 };
 ```
 

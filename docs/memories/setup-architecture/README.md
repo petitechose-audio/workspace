@@ -1,345 +1,124 @@
-# Architecture Setup & Distribution
+# Setup & Distribution Architecture
 
-> Plan pour une installation simple, portable et reproductible.
+Ce document décrit l'architecture d'installation pour :
 
-## Objectifs
+1) le dev environment (`ms-dev-env`, bootstrap via `uv` + `ms`)
+2) la distribution end-user (nightly/release + installer Rust)
 
-1. **Simplicite** : `git clone` + `ms setup` = pret a l'emploi
-2. **Portabilite** : Fonctionne sur Windows, Linux, macOS sans dependances systeme
-3. **Reproductibilite** : Meme environnement partout (toolchains bundlees)
-4. **Zero admin** : Pas de sudo/admin pour l'usage quotidien
+## Principes
 
----
+- Entrée canonique (dev) : `uv run ms ...`
+- Un seul workflow "one click" : `uv run ms setup --yes`
+- Exécution safe : pas de `shell=True`, uniquement argv, et install système via allowlist
+- Parité : Windows / macOS / Linux (Ubuntu + Fedora)
 
-## Modes d'installation
+## Dev environment (actuel)
 
-### Mode User (defaut)
+### Objectif
 
-```bash
-git clone https://github.com/miu-lab/midi-studio
-cd midi-studio
-./ms setup              # ~30 sec, telecharge binaires
-ms run core             # Fonctionne immediatement
-```
+`git clone` + `uv run ms setup --yes` doit produire un environnement capable de :
 
-- Telecharge uniquement les **binaires pre-compiles**
-- Pas de toolchains (pas de Zig, Rust, Java, Emscripten...)
-- Setup ultra-rapide (~50MB au lieu de ~2GB)
+- build/run simulateurs natifs (core, bitwig)
+- build/serve simulateurs WASM (core, bitwig)
+- build/upload/monitor firmware Teensy (core, bitwig)
+- exécuter `oc-bridge` (précompilé par défaut)
 
-### Mode Dev
+### Commandes
 
-```bash
-git clone https://github.com/miu-lab/midi-studio
-cd midi-studio
-./ms setup --dev        # ~5 min, telecharge toolchains
-ms build core           # Build from source
-```
+- Setup complet : `uv run ms setup --yes`
+- Vérifier : `uv run ms check`
+- Synchroniser : `uv run ms sync --repos` / `uv run ms sync --tools`
+- Status multi-repos : `uv run ms status`
 
-- Telecharge **toutes les toolchains**
-- Peut modifier et rebuilder tous les composants
-
----
-
-## Structure du workspace
+### Layout workspace
 
 ```
-pc/
-├── bin/                          # Binaires (GitHub Releases, PAS dans git)
-│   ├── .version                  # Tag de la release actuelle
-│   ├── core/
-│   │   ├── native/
-│   │   │   ├── windows/midi_studio_core.exe
-│   │   │   ├── linux/midi_studio_core
-│   │   │   └── macos/midi_studio_core
-│   │   └── wasm/
-│   │       ├── midi_studio_core.html
-│   │       ├── midi_studio_core.js
-│   │       └── midi_studio_core.wasm
-│   ├── bitwig/
-│   │   ├── native/{platform}/...
-│   │   └── wasm/...
-│   ├── bridge/
-│   │   ├── windows/oc-bridge.exe
-│   │   ├── linux/oc-bridge
-│   │   └── macos/oc-bridge
-│   └── extension/
-│       └── MidiStudio.bwextension
-│
-├── tools/                        # Toolchains (mode --dev uniquement)
-│   ├── bin/                      # Wrappers (zig-cc, zig-cxx)
-│   ├── cmake/
-│   ├── ninja/
-│   ├── zig/
-│   ├── emsdk/
-│   ├── jdk/
-│   ├── maven/
-│   ├── bun/
-│   ├── platformio/               # tools/platformio/venv
-│   ├── windows/SDL2/             # Windows uniquement
-│   ├── linux/SDL2/               # A implementer
-│   └── macos/SDL2/               # A implementer
-│
-├── .venv/                        # Python venv
-├── open-control/                 # Submodule
-├── midi-studio/                  # Submodule
-└── config.toml
+ms-dev-env/
+  ms/                  # CLI Python (package)
+  open-control/         # repos OpenControl (git clones)
+  midi-studio/          # repos MIDI Studio (git clones)
+  tools/                # toolchains bundlées (dev)
+  bin/                  # binaires buildés/installés (dev)
+  .ms/                  # état/cache (PlatformIO, lockfiles)
+  .venv/                # env Python (uv)
+  config.toml           # config optionnelle (paths, Bitwig)
 ```
 
----
+Notes:
 
-## Outils : Bundle vs Systeme
+- Les repos requis pour build/run sont pin dans `ms/data/repos.toml`.
+- Les versions toolchains sont pin dans `ms/data/toolchains.toml`.
 
-### Outils bundles (dans tools/)
+### Bundled vs system deps
 
-| Outil | Chemin | Toutes plateformes |
-|-------|--------|-------------------|
-| cmake | `tools/cmake/` | Oui |
-| ninja | `tools/ninja/` | Oui |
-| zig | `tools/zig/` | Oui |
-| bun | `tools/bun/` | Oui |
-| java (JDK) | `tools/jdk/` | Oui |
-| maven | `tools/maven/` | Oui |
-| emscripten | `tools/emsdk/` | Oui |
-| SDL2 | `tools/{platform}/SDL2/` | A completer (Linux/macOS) |
-| platformio | `tools/platformio/venv/` | Oui |
+Bundlés via `ms sync --tools` (dev) :
 
-### Outils systeme (non bundles)
+- CMake, Ninja
+- Zig (Windows)
+- Emscripten (WASM)
+- JDK + Maven (Bitwig extension)
+- PlatformIO (venv dans `tools/platformio/venv`)
 
-| Outil | Raison | Installation |
-|-------|--------|--------------|
-| git | Requis pour clone | Pre-installe ou `winget`/`apt`/`brew` |
-| gh | Optionnel (GitHub CLI) | `winget`/`apt`/`brew` |
-| uv | Bootstrap Python deps | https://docs.astral.sh/uv/ |
-| cargo/rust | Bridge build (dev only) | rustup.rs |
+Système (guidé par `ms prereqs` / `ms check`) :
 
-### Pourquoi ne pas bundler Rust ?
+- `uv` (prérequis pour lancer `ms`)
+- `git` (requis pour sync repos, mais installable/guidable)
+- libs build natives (Linux) : SDL2, ALSA, libudev, pkg-config, toolchain C/C++
+- macOS : Xcode CLT (SDL2 optionnel; fallback FetchContent côté CMake)
 
-- Cout/benefice defavorable (~500MB pour un seul binaire)
-- Rustup est deja un installeur cross-platform simple
-- Le bridge ne change pas souvent
-- Cargo.lock garantit la reproductibilite des deps
+## CI (actuel)
 
----
+Il y a 2 workflows distincts :
 
-## Commandes CLI
+- `.github/workflows/ci.yml` (push/PR): tests/typing + smoke CLI en dry-run
+  - matrice runners: ubuntu / windows / macos
+  - Fedora: job séparé en container (pas de runner fedora GitHub-hosted)
 
-| Commande | Mode | Description |
-|----------|------|-------------|
-| `ms setup` | User | Telecharge binaires depuis GitHub Release |
-| `ms setup --dev` | Dev | + Telecharge toolchains |
-| `ms update` | Both | Sync repos + nouveaux binaires si disponibles |
-| `ms update --check` | Both | Verifie sans modifier |
-| `ms build <target>` | Dev | Build from source |
-| `ms run <target>` | Both | Lance l'application |
-| `ms doctor` | Both | Verifie l'installation |
+- `.github/workflows/builds.yml` (schedule + manual): builds réels
+  - native: Windows/macOS/Linux
+  - wasm: Ubuntu uniquement
+  - Pages: déploie les artefacts WASM sous `/demo/<app>/latest/`
 
----
+## Distribution (à implémenter)
 
-## Distribution des binaires
+### Objectif
 
-### Recommandation : GitHub Releases
+Deux canaux, un seul contrat: un manifest décrit exactement les binaires installables.
 
-| Critere | Git LFS | GitHub Releases |
-|---------|---------|-----------------|
-| Repo size | Bloated | Clean |
-| Quota | 1GB free | Illimite |
-| Clone speed | Lent | Rapide |
-| Standard | Non | Oui |
+- Canal `nightly`:
+  - build automatique 1x/jour uniquement si changement dans `ms-dev-env` OU dans un repo syncé (`ms/data/repos.toml`)
+  - publie un manifest + assets (pré-release)
 
-### Workflow
+- Canal `release`:
+  - déclenché manuellement
+  - release unique (tag immuable) + manifest + assets
 
-1. Tag une release (`git tag v1.0.0`)
-2. CI/CD build sur Windows/Linux/macOS
-3. Upload binaires sur GitHub Release
-4. `ms setup` telecharge depuis la release
+### Manifest (contrat)
 
----
+Le manifest doit inclure :
 
-## Droits administrateur
+- channel (`nightly`/`release`), build id (date/sha)
+- sha `ms-dev-env`
+- sha de chaque repo syncé (`open-control/*`, `midi-studio/*`)
+- liste d'assets + sha256 (bridge, simulateurs, wasm, extension, firmware, uploader)
 
-### Principe : Admin uniquement pour install service (1 fois)
+## Installer end-user (à implémenter)
 
-| Plateforme | Action | Admin | Mecanisme |
-|------------|--------|-------|-----------|
-| Windows | `ms setup` | Non | - |
-| Windows | `ms setup --dev` | Non | - |
-| Windows | `oc-bridge install` | **UAC 1x** | Windows Service (SCM) |
-| Windows | `oc-bridge start/stop` | Non | ACL configuree |
-| Linux | `ms setup` | Non | - |
-| Linux | `oc-bridge install` | **pkexec 1x** | dialout + udev rules |
-| Linux | Usage quotidien | Non | systemd user service |
-| macOS | `ms setup` | Non | - |
-| macOS | `oc-bridge install` | **Non** | launchd user agent |
-| macOS | Usage quotidien | Non | - |
+### Objectif
 
-### Detail par plateforme
+Un binaire Rust (TUI ou GUI) qui :
 
-#### Windows
-- **Service** : Windows Service via SCM
-- **Install** : UAC popup (1 fois)
-- **Apres install** : ACL permet start/stop sans admin
-- **Code** : `src/service/windows.rs`
+- permet de choisir canal + version (par défaut: `release` + latest)
+- installe / met à jour / désinstalle les binaires finaux uniquement
+- gère l'intégration OS (raccourcis + bridge service)
 
-#### Linux
-- **Service** : systemd user service (`~/.config/systemd/user/`)
-- **Install** : pkexec pour `usermod -aG dialout` + udev rules
-- **Apres install** : Aucun admin requis
-- **Code** : `src/service/linux.rs`
+### Intégration bridge service
 
-#### macOS
-- **Service** : launchd user agent (`~/Library/LaunchAgents/`)
-- **Install** : Aucun admin requis (user agent)
-- **Code** : `src/service/macos.rs` (A IMPLEMENTER)
+Le bridge (`oc-bridge`) implémente déjà des commandes service (Windows/Linux).
+L'installer doit réutiliser ces commandes plutôt que dupliquer la logique.
 
----
+## Source de vérité
 
-## Services par plateforme
-
-### Windows Service
-
-```
-Type: Windows Service (SCM)
-Nom: OpenControlBridge
-Config: Registry
-Admin: UAC pour install/uninstall
-Start/Stop: Sans admin (ACL)
-```
-
-### Linux systemd
-
-```
-Type: systemd user service
-Fichier: ~/.config/systemd/user/oc-bridge.service
-Admin: pkexec pour dialout + udev (1 fois)
-Start/Stop: systemctl --user start/stop oc-bridge
-```
-
-### macOS launchd (A implementer)
-
-```
-Type: launchd user agent
-Fichier: ~/Library/LaunchAgents/com.opencontrol.bridge.plist
-Admin: Jamais
-Start/Stop: launchctl start/stop com.opencontrol.bridge
-```
-
-Exemple de plist :
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" 
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.opencontrol.bridge</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/path/to/oc-bridge</string>
-        <string>--daemon</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-</dict>
-</plist>
-```
-
----
-
-## Plan d'implementation
-
-### Phase 1 : Fondations (actuel)
-- [x] Zig compiler pour builds natifs (wrappers zig-cc/zig-cxx)
-- [x] Fix WASM MIDI (patch libremidi)
-- [x] Fix Windows MIDI ports (patterns specifiques)
-- [x] Fix `ms doctor` (check_tool avec ToolResolver)
-
-### Phase 2 : Portabilite
-- [ ] Bundler SDL2 pour Linux
-- [ ] Bundler SDL2 pour macOS
-- [ ] Deplacer PlatformIO dans `tools/`
-- [ ] Implementer service macOS (launchd)
-
-### Phase 3 : Distribution
-- [ ] Implementer dual mode `ms setup` / `ms setup --dev`
-- [ ] CI/CD GitHub Actions (build cross-platform)
-- [ ] Publier binaires sur GitHub Releases
-- [ ] Implementer `ms update`
-
-### Phase 4 : Polish
-- [ ] Documentation utilisateur
-- [ ] Tests d'installation sur VM fresh
-- [ ] Optimiser taille des binaires
-
----
-
-## CI/CD (a creer)
-
-```yaml
-# .github/workflows/release.yml
-name: Release
-
-on:
-  push:
-    tags: ['v*']
-
-jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            platform: linux
-          - os: windows-latest
-            platform: windows
-          - os: macos-latest
-            platform: macos
-    
-    runs-on: ${{ matrix.os }}
-    
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      
-      - name: Setup
-        run: ./ms setup --dev
-      
-      - name: Build all
-        run: |
-          ms build core native
-          ms build core wasm
-          ms build bitwig native
-          ms build bitwig wasm
-          ms build bridge
-          ms build extension
-      
-      - uses: actions/upload-artifact@v4
-        with:
-          name: binaries-${{ matrix.platform }}
-          path: bin/
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-      
-      - uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            binaries-windows/**/*
-            binaries-linux/**/*
-            binaries-macos/**/*
-```
-
----
-
-## References
-
-- [Emscripten Asyncify](https://emscripten.org/docs/porting/asyncify.html)
-- [Windows Services](https://docs.microsoft.com/en-us/windows/win32/services/)
-- [systemd user services](https://wiki.archlinux.org/title/Systemd/User)
-- [launchd plist](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html)
-- [GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github)
+- CLI: `uv run ms --help`
+- CI: `.github/workflows/ci.yml`, `.github/workflows/builds.yml`
+- Roadmap exécutable: `docs/memories/work/feature-all-distribution-installer/README.md`

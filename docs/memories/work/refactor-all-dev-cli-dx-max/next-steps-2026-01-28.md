@@ -1,7 +1,9 @@
 # Next steps (2026-01-28)
 
-This document is the "executable plan" from the current state.
-Every step is designed to be small, testable, and traceable.
+This document was the "executable plan" as of 2026-01-28.
+
+Status (2026-01-29): executed / historical. Keep as a record; new roadmap lives in
+`docs/memories/work/feature-all-distribution-installer/README.md`.
 
 ## Current state (baseline)
 

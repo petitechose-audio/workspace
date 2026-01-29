@@ -1,9 +1,9 @@
 # Feature: Preset Storage System
 
 **Scope**: midi-studio, open-control
-**Status**: in progress - SDCardBackend implémenté
+**Status**: planned/in progress (storage backends implemented; preset system pending)
 **Created**: 2026-01-19
-**Updated**: 2026-01-20 - SDCardBackend remplace LittleFS (non-bloquant)
+**Updated**: 2026-01-29 - Align docs with current code (IStorage + SD/File/Memory backends)
 
 ## Objectif
 
@@ -22,9 +22,9 @@ V2 étend V1 sans breaking changes.
 
 | Feature | Description |
 |---------|-------------|
-| Persistence Native | FileStorageBackend → fichier local |
-| Persistence WASM | FileStorageBackend → IndexedDB (IDBFS) |
-| Persistence Teensy | SDCardBackend → SD card (✅ implémenté, non-bloquant) |
+| Persistence Native | `oc::impl::FileStorage` → fichier local (✅ implémenté, utilisé) |
+| Persistence WASM | `desktop::MemoryStorage` → RAM (✅ implémenté, volatile) |
+| Persistence Teensy | `oc::hal::teensy::SDCardBackend` → SD card (✅ implémenté, non-bloquant) |
 | Zero-boilerplate | `Persistent<T>` avec dirty auto-detection |
 | Migration legacy | CoreSettings 8 pages → PresetData |
 | Pages variables | 1-8 pages par preset |
@@ -47,20 +47,20 @@ V2 étend V1 sans breaking changes.
 ## Architecture
 
 ```
-V1:
-  CoreState → PresetManager → Persistent<PresetData> → IStorageBackend
-                                                            │
-                          ┌─────────────────────────────────┤
-                          ▼               ▼                 ▼
-                   SDCardBackend    FileStorageBackend  FileStorageBackend
-                     (Teensy)          (Native)          (WASM+IDBFS)
+V1 (today):
+  CoreState/CoreSettings → Settings<T> → oc::interface::IStorage
+                                                     │
+                          ┌──────────────────────────┼────────────────────┐
+                          ▼                          ▼                    ▼
+                   SDCardBackend                FileStorage          MemoryStorage
+                     (Teensy)                   (Native)               (WASM)
 
 V2 (extension):
   PresetManager → IPresetBank (multi-presets)
                        │
-         ┌─────────────┼─────────────┐
-         ▼             ▼             ▼
-    FilePresetBank  SDCardBank   HttpPresetBank
+          ┌─────────────┼─────────────┐
+          ▼             ▼             ▼
+     FilePresetBank  SDCardBank   HttpPresetBank
 ```
 
 ## Fichiers
@@ -68,7 +68,7 @@ V2 (extension):
 | Fichier | Description |
 |---------|-------------|
 | `README.md` | Ce fichier - overview |
-| `v1-tech-spec.md` | Spec technique V1 (à implémenter) |
+| `v1-tech-spec.md` | Spec technique V1 (storage backends + intégration actuelle) |
 | `v1-optimizations.md` | Optimisations V1 (Persistent<T>, etc.) |
 | `v2-roadmap.md` | Roadmap V2 (futur) |
 | `draft-generic-preset-system.md` | **Draft** - Architecture générique presets |

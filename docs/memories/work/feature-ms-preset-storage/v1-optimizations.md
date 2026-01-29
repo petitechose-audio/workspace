@@ -1,7 +1,10 @@
 # V1 Optimizations: Zero-Boilerplate Persistence
 
 **Date**: 2026-01-19
-**Status**: ✅ Validé - LittleFS persistence confirmée
+**Status**: ✅ Validé - LittleFS persistence confirmée (historical)
+
+Note (2026-01-29): LittleFS can still be useful, but the current product direction uses SD card (SDIO)
+for non-blocking persistence. See `docs/memories/work/feature-ms-preset-storage/v1-tech-spec.md`.
 
 ---
 
@@ -20,11 +23,11 @@ Test sur Teensy 4.1 avec `midi-studio/tests/littlefs-persistence/` :
 - Code < 512KB (test: ~60KB, bien sous la limite)
 - Flash persistant: 7424KB disponibles
 
-**Décision architecture** :
+**Décision architecture (updated)** :
 | Storage | Usage |
 |---------|-------|
 | **EEPROM** | Settings globaux uniquement (~64 bytes max) |
-| **LittleFS** | Presets, séquences, config notes, note fx, etc. |
+| **SD card (SDIO)** | Presets, séquences, config notes, note fx, etc. |
 
 ---
 
