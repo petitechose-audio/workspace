@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from ms.services.dist import package_platform
+from ms.platform.detection import Platform, detect
 
 
 def test_package_platform_handles_epoch_mtime(tmp_path: Path) -> None:
@@ -13,12 +14,17 @@ def test_package_platform_handles_epoch_mtime(tmp_path: Path) -> None:
     (tmp_path / "bin" / "bitwig" / "native").mkdir(parents=True)
     (tmp_path / "dist").mkdir()
 
-    # Create a tool file with an epoch mtime (1970), which would normally break ZIP.
-    tool_dir = tmp_path / ".ms" / "platformio" / "packages" / "tool-teensy"
-    tool_dir.mkdir(parents=True)
-    uploader = tool_dir / "teensy_loader_cli"
-    uploader.write_bytes(b"cli")
-    os.utime(uploader, (0, 0))
+    # Create the per-platform uploader binary with an epoch mtime (1970), which
+    # would normally break ZIP (timestamps before 1980 are invalid in ZIP).
+    info = detect()
+    loader_name = (
+        "midi-studio-loader.exe" if info.platform == Platform.WINDOWS else "midi-studio-loader"
+    )
+    loader_dir = tmp_path / "midi-studio" / "loader" / "target" / "release"
+    loader_dir.mkdir(parents=True)
+    loader_bin = loader_dir / loader_name
+    loader_bin.write_bytes(b"loader")
+    os.utime(loader_bin, (0, 0))
 
     created = package_platform(
         workspace_root=tmp_path,
@@ -26,5 +32,5 @@ def test_package_platform_handles_epoch_mtime(tmp_path: Path) -> None:
         require_uploader=True,
     )
 
-    # We should at least get the uploader bundle and native bundle (even if empty-ish).
+    # We should at least get the uploader bundle.
     assert any(p.name.endswith("-teensy-uploader.zip") for p in created)
