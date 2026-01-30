@@ -326,7 +326,7 @@ integration.
 - [x] Lib: rename flash-scoped event type to an operation-scoped event type
   - Replaced `FlashEvent` with `OperationEvent` (no legacy support).
   - JSON event names remain stable (contract), while Rust types now reflect multi-operation scope.
-- [ ] Lib: introduce an operation runner shared by flash/reboot
+- [x] Lib: introduce an operation runner shared by flash/reboot
   - Shared pipeline: discover -> select -> bridge pause/resume -> per-target run -> aggregation.
   - Flash/reboot only implement the per-target action.
 - [x] Tests: strengthen JSON contract coverage
