@@ -304,9 +304,9 @@ integration.
 - [x] Lib: move reboot flow into a library use-case
   - `reboot_api` reuses the same event stream as flashing.
 
-- [ ] Lib: rename flash-scoped event type to an operation-scoped event type
-  - Replace `FlashEvent` with `OperationEvent` (no legacy support; allowed since there are no external users).
-  - Keep JSON event names stable (contract), but the Rust type should reflect the multi-operation scope.
+- [x] Lib: rename flash-scoped event type to an operation-scoped event type
+  - Replaced `FlashEvent` with `OperationEvent` (no legacy support).
+  - JSON event names remain stable (contract), while Rust types now reflect multi-operation scope.
 - [ ] Lib: introduce an operation runner shared by flash/reboot
   - Shared pipeline: discover -> select -> bridge pause/resume -> per-target run -> aggregation.
   - Flash/reboot only implement the per-target action.
