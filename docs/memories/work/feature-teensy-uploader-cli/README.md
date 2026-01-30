@@ -1,6 +1,6 @@
 # Feature: Teensy 4.1 Uploader CLI (Rust)
 
-**Status**: started
+**Status**: in_progress
 
 **Created**: 2026-01-29
 **Updated**: 2026-01-29
@@ -15,6 +15,12 @@ Constraints:
 - Reliable on Windows/macOS/Linux
 - No UI in this phase (installer integration is later)
 
+Primary UX goal now:
+
+- `flash firmware.hex` "just works" when exactly one target is detected
+- If multiple targets exist: require explicit selection (`--device`) or batch (`--all`)
+- `--all` flashes every detected Teensy target sequentially
+
 ## Scope (minimal)
 
 - Flash an Intel HEX to a Teensy 4.1 in HalfKay bootloader mode
@@ -22,13 +28,21 @@ Constraints:
 - Optional: reboot after programming
 - Deterministic exit codes + optional machine-readable output
 
+New in-scope items (to reduce end-user friction):
+
+- Multi-device selection (`--device`) and batch flashing (`--all`)
+- Auto target detection (HalfKay and/or USB Serial)
+- Safe-by-default behavior when multiple devices are present
+
 Non-goals (for now):
 
-- No multi-board support
 - No Teensy 4.0/3.x/2.x
 - No hard-reboot "rebootor" support
-- No soft reboot (device -> bootloader) unless it is trivial and reliable
+- No firmware signature/verification system (belongs to installer/later)
 - No GUI/TUI
+
+Note: soft reboot via USB Serial (134 baud) is now considered "trivial and reliable" when the
+running firmware exposes USB Serial.
 
 ## Key facts from PJRC teensy_loader_cli (reference)
 
@@ -55,6 +69,27 @@ Note:
 - HalfKay bootloader (target): VID:PID = `16C0:0478`
 - Rebootor (hard reboot, out-of-scope): `16C0:0477`
 - USB Serial device (soft reboot attempt, libusb path): `16C0:0483`
+
+### MIDI Studio firmware USB type (important)
+
+MIDI Studio firmware builds use `USB_MIDI_SERIAL`:
+
+- `midi-studio/core/platformio.ini`
+- `midi-studio/plugin-bitwig/platformio.ini`
+
+In Teensy core descriptors (`framework-arduinoteensy/.../cores/teensy4/usb_desc.h`),
+`USB_MIDI_SERIAL` uses PID `0x0489`.
+
+This matters because we can reliably enter bootloader via the **USB Serial 134 baud** mechanism.
+
+### Teensy "134 baud" bootloader entry mechanism (ground truth)
+
+In Teensyduino core, setting the CDC line coding baud rate to `134` triggers a delayed call to
+`_reboot_Teensyduino_()`.
+
+This is implemented in PlatformIO's Teensy core:
+
+- `framework-arduinoteensy/cores/usb_serial/usb.c` (handles CDC_SET_LINE_CODING + reboot timer)
 
 ### Teensy 4.1 memory geometry
 
@@ -117,6 +152,18 @@ Commands:
 - `flash <path.hex>`
 - `list`
 
+New/expanded:
+
+- `reboot` (best-effort entry to HalfKay)
+- `--device <selector>` (select exactly one target)
+- `--all` (flash every detected target sequentially)
+
+Selector formats:
+
+- `serial:COM6` / `serial:/dev/ttyACM0`
+- `halfkay:<hid-path>`
+- `index:<n>` (index in the `list` output order)
+
 Options:
 
 - `--wait` : wait for HalfKay to appear
@@ -132,8 +179,50 @@ Exit codes (stable):
 - `10` no device (HalfKay not found)
 - `11` invalid hex
 - `12` write failed
-- `13` verify failed (if we add verify)
+- `13` ambiguous target (multiple possible targets without explicit selection, or ambiguous HalfKay emergence)
 - `20` unexpected error
+
+## Target model
+
+We model "targets" as:
+
+- **HalfKay targets**: devices already in bootloader mode (HID `16C0:0478`)
+- **Serial targets**: USB Serial ports belonging to PJRC VID `16C0` (usually our app-mode devices)
+
+`--all` includes all targets from the initial snapshot (HalfKay + Serial) and flashes them
+sequentially.
+
+## Serial -> correct HalfKay association (no brittle COM<->HID mapping)
+
+When flashing a Serial target:
+
+1) Snapshot `before = set(list_halfkay_paths())`
+2) Trigger soft reboot on the serial port (set baud 134)
+3) Wait for HalfKay to appear:
+   - poll list_halfkay_paths()
+   - compute `new = paths - before`
+   - if `len(new) == 1` => select that path
+   - if `len(new) > 1` => ambiguous (fail safe)
+   - if timeout => no device
+4) Flash *by that path* (open by path; reopen by path on retries)
+
+This provides correct device targeting even when multiple Teensys are connected.
+
+## JSON contract (installer-friendly)
+
+JSON lines to stdout with:
+
+- `schema`: integer (start at 1)
+- `event`: string
+- `target_id`: stable id for selection (e.g. `serial:COM6`, `halfkay:<path>`)
+- `kind`: `serial|halfkay`
+
+Key events:
+
+- `discover_start`, `discover_done`, `target_detected`, `target_selected`, `target_ambiguous`
+- `soft_reboot`, `soft_reboot_skipped`, `halfkay_appeared`
+- existing flash events: `hex_loaded`, `block`, `retry`, `boot`, `done`
+- per-target summary for `--all`: `target_done` with `ok=true/false` + `error_code`
 
 ## Roadmap (very specific)
 
@@ -184,7 +273,31 @@ Acceptance criteria:
 - 10 consecutive flashes on macOS + Linux
 - Works with `midi-studio/*` firmware HEX produced by PlatformIO
 
-### Phase 2 - Verification (optional but recommended)
+### Phase 2 - Multi-target selection + auto detection (next)
+
+Goal: reduce friction and make the uploader safe in multi-device setups.
+
+Tasks:
+
+1) Implement target discovery (HalfKay + Serial)
+2) Add `--device` and `--all` to the CLI
+3) Auto-selection:
+   - if exactly one HalfKay exists, select it (even if other serial targets exist)
+   - else if exactly one total target exists, select it
+   - else ambiguous without explicit selection
+4) Implement Serial->HalfKay association via "delta HalfKay" approach
+5) Add stable exit code for ambiguous target
+6) Expand JSON events for discovery and per-target summaries
+7) Add unit tests for selector parsing, resolve, and delta logic
+
+Acceptance criteria:
+
+- App-mode only (USB Serial): `flash fw.hex` enters HalfKay and flashes without specifying COM
+- Bootloader only (HalfKay): `flash fw.hex` flashes without `--wait`
+- Multiple devices: without selector exits ambiguous + prints selectable ids
+- `--device` flashes the chosen device; `--all` flashes all targets sequentially
+
+### Phase 3 - Verification (optional but recommended)
 
 If HalfKay supports readback/verify for T4.1, implement verify.
 If not, add basic sanity verification:
@@ -197,7 +310,7 @@ Deliverables:
 
 - `--verify` flag (or document why verify is not possible)
 
-### Phase 3 - "Smooth" entry to bootloader (still CLI)
+### Phase 4 - "Smooth" UI (later)
 
 Goal: reduce manual reset presses.
 
@@ -206,10 +319,10 @@ Options to evaluate:
 - soft reboot via USB serial (cross-platform) when firmware exposes it
 - integrate a tiny "reboot endpoint" in MIDI Studio firmware (future)
 
-Deliverables:
+Deliverables (later):
 
-- `--enter-bootloader` best-effort
-- fallback prompt "press reset now" after timeout
+- progress bar / interactive command (no args)
+- installer integration
 
 ### Phase 4 - Integration hooks (not implemented here)
 
