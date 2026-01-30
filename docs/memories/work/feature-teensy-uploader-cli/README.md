@@ -335,12 +335,19 @@ integration.
 
 #### P1
 
-- [ ] Lib: typed selection API (avoid re-parsing selector strings)
+- [x] Lib: typed selection API (avoid re-parsing selector strings)
   - Add a parsed selector type exposed by the lib.
-- [ ] Bridge: explicit policy surface
+- [x] Bridge: explicit policy surface
   - `--bridge-method=auto|control|service|process|none` + optional `--no-process-fallback`.
-- [ ] IPC: formal request/response schema
+- [x] IPC: formal request/response schema
   - Add `schema` fields and strict parsing for oc-bridge control plane.
+
+#### Implementation notes
+
+- Typed selector: `FlashSelection::Device(TargetSelector)` (selector parsing happens in the CLI).
+- Bridge policy: plumbed into `BridgeControlOptions` and applied in `pause_oc_bridge`.
+- IPC schema: loader now sends `{"schema":1,...}` in requests; responses accept an optional schema field when present.
+- Observability: opt-in `tracing` via `RUST_LOG` or `MIDI_STUDIO_LOADER_LOG` (stderr only).
 
 ### Phase 0 - Repo + build system
 
