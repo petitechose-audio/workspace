@@ -67,6 +67,9 @@ These are prerequisites we rely on.
 - Distribution uses a dedicated repo (GitHub Releases + Pages).
 - Bundles are cohesive: end user selects a bundle tag (not per-component versions).
 - Channels: stable/beta/nightly.
+- Default install + rollback (v1):
+  - Stable installs from GitHub Releases `latest` (manifest + signature).
+  - Advanced selection/rollback lists tags via GitHub Releases API.
 - Nightly selection: per repo, pick the latest commit with CI success; skip nightly if any repo lacks a green commit.
 - macOS/Linux: user services when possible.
 - Windows: admin allowed; service points to stable `current/`.
@@ -87,6 +90,9 @@ Status values: TODO | IN PROGRESS | DONE
 - Phase 02 (DONE): Distribution Repo + CI (stable/beta/nightly) + Pages Demos
   - File: `phase-02-distribution-repo-ci.md`
 
+- Phase 02b (TODO): Maintainer Release Command (ms release publish)
+  - File: `phase-02b-maintainer-release-command.md`
+
 - Phase 03 (TODO): oc-bridge Upstream: Service Name Config + Linux Desktop Toggle
   - File: `phase-03-oc-bridge-service-names.md`
 
@@ -106,6 +112,9 @@ Status values: TODO | IN PROGRESS | DONE
   - File: `phase-08-e2e-and-first-release.md`
 
 ## Phase Dependencies (important)
+
+- Phase 02b is a prerequisite for Phase 03+.
+  - Rationale: publishing must be repeatable and maintainer-safe before we change upstream services.
 
 - Phase 03 is a prerequisite for Phases 05/06/07.
   - Rationale: atomic `current/` upgrades and bridge lifecycle management require a stable service name and a stable service exec path (not a versioned `current_exe()` result).

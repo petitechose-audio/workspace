@@ -185,6 +185,9 @@ CI checks (required):
   - bundle contains expected files
   - channel pointer update instructions are emitted (and/or channel pointers updated manually)
 
+Maintainer UX (next):
+- Prefer publishing stable/beta via the maintainer command in Phase 02b (`ms release ...`).
+
 ## Security hardening (recommended)
 
 High ROI measures to protect the signing key:
