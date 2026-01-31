@@ -1,0 +1,92 @@
+# Phase 00: Baseline Verification + Repo Inventory
+
+Status: TODO
+
+## Goal
+
+Verify that the current codebase and recent commits match the assumptions in `README.md`.
+If anything differs, update the plan before implementing new work.
+
+## Why This Exists
+
+This workflow spans multiple repos (midi-studio, open-control, ms-manager, distribution).
+Before adding new infrastructure, we must confirm:
+
+- the installer-facing JSON contract is stable enough to build a GUI on top
+- the bridge/service behaviors match the chosen strategy
+- the build inputs/outputs are well understood
+
+## Tasks
+
+1) Verify loader JSON contract (required dependency)
+
+- Run:
+  - `midi-studio-loader.exe list --json`
+  - `midi-studio-loader.exe doctor --json`
+  - `midi-studio-loader.exe flash <hex> --dry-run --json --json-progress none`
+- Confirm:
+  - `list --json` emits a single event `{schema,event:"list"}`.
+  - `flash` emits `operation_summary` even when `--json-progress none`.
+  - `operation_summary` contains `exit_code`, `targets_*`, `bridge_*`, `blocks`, `retries`.
+
+2) Verify oc-bridge capabilities and gaps
+
+- Run:
+  - `oc-bridge --help`
+  - `oc-bridge ctl --help`
+  - `oc-bridge install --help`
+- Confirm:
+  - control plane exists (ctl pause/resume/status)
+  - Windows service exists but uses hard-coded service name today
+  - Linux service exists but uses hard-coded service name + installs a .desktop today
+
+Also verify a critical upgrade detail:
+- Linux systemd user install uses `current_exe()`; if `current/` is a symlink to `versions/<tag>`,
+  ExecStart may be written with a versioned path. That breaks “switch current => restart service”.
+  Record current behavior and treat it as a must-fix in Phase 03 (service exec path override).
+
+3) Inventory what the end-user bundle will include (v1)
+
+Record the exact “v1 payload set” we will ship in the distribution bundle:
+
+- `ms-manager` (GUI)
+- `midi-studio-loader` (firmware flashing)
+- `oc-bridge` + `bridge/config/default.toml` + `bridge/config/devices/teensy.toml`
+- Bitwig extension: `midi_studio.bwextension`
+- Teensy firmware bundles
+
+4) Freeze OS/arch matrix (v1)
+
+- Windows x86_64
+- macOS x86_64 + arm64
+- Linux x86_64
+
+5) Define install root + `current/` semantics per OS
+
+- Windows: app in Program Files, payload+current in ProgramData, stable service path to `current/`.
+- macOS: app in /Applications, payload+current in user Application Support.
+- Linux: app user-level, payload+current in `~/.local/share/midi-studio`.
+
+6) Decide and document “CI passed” meaning for nightly selection
+
+- Define one canonical workflow name per repo (recommended: `CI`).
+- Nightly selection rule:
+  - choose latest commit on `main` that has a successful run of that workflow
+  - skip nightly if any repo has no successful run
+  - build distribution bundle; if it fails, publish nothing
+
+## Exit Criteria
+
+- All confirmations above are true, or the plan is updated to match reality.
+- `README.md` baseline section remains accurate.
+- The v1 payload set is clearly recorded.
+
+## Tests
+
+Quick checks (local):
+- Run the commands listed in Tasks 1 and 2.
+
+Full checks (local):
+- `cargo test` in:
+  - `midi-studio/loader`
+  - `open-control/bridge`

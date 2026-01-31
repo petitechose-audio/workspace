@@ -1,0 +1,72 @@
+# Phase 03: oc-bridge Upstream - Service Name Config + Linux Desktop Toggle
+
+Status: TODO
+
+## Goal
+
+Upstream changes to `open-control/bridge` so MIDI Studio can install and manage oc-bridge
+without colliding with other oc-bridge users.
+
+## Required Changes
+
+1) Windows service name configurability
+
+- Add CLI flags (recommended):
+  - `oc-bridge install --service-name <name> [--service-display-name <name>] [--service-description <text>]`
+  - `oc-bridge uninstall --service-name <name>`
+  - `oc-bridge ctl ...` remains unchanged (control plane is independent).
+
+Constraints:
+- Backwards compatible defaults:
+  - If flags not passed, keep current behavior for existing users.
+- Never delete/overwrite services not named by the user.
+
+Additional requirement (critical for upgrade safety):
+- Allow overriding the service executable path used in the service definition.
+  Rationale: `current_exe()` may resolve to a versioned path even when executed via `current/`.
+  MIDI Studio needs the service ExecStart/BinaryPath to reference a stable `current/` path.
+
+Recommended flag:
+- `--service-exec <absolute_path>`
+
+2) Linux systemd user unit name configurability
+
+- Add `--service-name <name>` support for Linux service unit.
+- Ensure the generated unit file uses the correct name.
+
+Additional requirement (critical for upgrades):
+- Allow overriding ExecStart path to the stable `current/` path.
+  Recommended flag: `--service-exec <absolute_path>`.
+
+3) Linux: disable .desktop install
+
+- Add flag: `oc-bridge install --no-desktop-file`.
+- MIDI Studio will manage its own desktop integration; oc-bridge should not add extra menu entries.
+
+## MIDI Studio Default Names
+
+Recommended values (documented in ms-manager):
+- Windows service name: `MidiStudioBridge`
+- Linux user unit: `midi-studio-bridge`
+- macOS LaunchAgent id: `com.petitechose.midi-studio.bridge`
+
+## Exit Criteria
+
+- oc-bridge supports configurable service name on Windows and Linux.
+- Linux `--no-desktop-file` works.
+- Existing oc-bridge users are not broken (defaults unchanged).
+
+## Tests
+
+Local:
+- `cargo test` in `open-control/bridge`
+
+Windows (manual smoke):
+- `oc-bridge install --service-name MidiStudioBridge`
+- verify service exists and starts
+- `oc-bridge uninstall --service-name MidiStudioBridge`
+
+Linux (manual smoke):
+- `oc-bridge install --service-name midi-studio-bridge --no-desktop-file`
+- `systemctl --user status midi-studio-bridge`
+- ensure no `.desktop` is created

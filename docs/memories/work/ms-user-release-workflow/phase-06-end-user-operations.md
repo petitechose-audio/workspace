@@ -1,0 +1,65 @@
+# Phase 06: End-user Operations - Bridge, Bitwig Extension, Firmware Flash, Diagnostics
+
+Status: TODO
+
+## Goal
+
+Implement the end-user operations in ms-manager:
+
+- manage oc-bridge (install/start/stop/restart/status)
+- deploy Bitwig extension
+- download and flash firmware (via midi-studio-loader)
+- provide a diagnostics report export
+
+## Operations (minimum viable)
+
+1) Bridge
+
+- Configure and install bridge as a user service on macOS/Linux.
+- Windows: install service with dedicated name (requires upstream oc-bridge flags).
+- Expose in UI:
+  - status
+  - restart
+  - open config folder
+
+2) Bitwig extension
+
+- Extract extension from bundle asset and copy to detected Bitwig Extensions dir.
+- UI:
+  - show detected path
+  - “open folder”
+  - “reinstall extension”
+
+3) Firmware flash
+
+- Select firmware from the installed bundle:
+  - `current/firmware/.../firmware.hex`
+- Flash via subprocess:
+  - `midi-studio-loader flash ... --json --json-timestamps --json-progress percent`
+- UI:
+  - list targets
+  - choose target
+  - show progress and final `operation_summary`
+
+4) Diagnostics
+
+- Collect:
+  - `midi-studio-loader doctor --json`
+  - `oc-bridge ctl status`
+  - installed tag/channel
+  - logs
+- Export as zip.
+
+## Exit Criteria
+
+- End-user can install bundle, restart bridge, deploy extension, and flash firmware.
+- Diagnostics export is usable for support.
+
+## Tests
+
+Local (fast):
+- Unit tests for path detection and command building.
+
+Local (manual smoke):
+- Plug device, flash dry-run, then flash real.
+- Restart service and confirm loader can pause/resume.
