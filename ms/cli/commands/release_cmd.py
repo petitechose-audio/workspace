@@ -401,6 +401,7 @@ def remove_cmd(
     tag: list[str] = typer.Option([], "--tag", help="Release tag to delete (repeatable)"),
     force: bool = typer.Option(False, "--force", help="Allow deleting stable tags"),
     ignore_missing: bool = typer.Option(False, "--ignore-missing", help="Ignore missing releases"),
+    yes: bool = typer.Option(False, "-y", "--yes", help="Skip confirmation prompt"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print actions without mutating"),
 ) -> None:
     """Remove releases (cleanup artifacts + delete GitHub Releases)."""
@@ -422,7 +423,7 @@ def remove_cmd(
     ctx.console.header("Remove Releases")
     for t in tags:
         ctx.console.print(f"- {t}")
-    if not dry_run:
+    if not dry_run and not yes:
         typed = typer.prompt("Type DELETE to confirm", default="")
         if typed.strip() != "DELETE":
             _exit("confirmation mismatch", code=ErrorCode.USER_ERROR)

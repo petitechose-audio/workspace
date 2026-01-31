@@ -53,6 +53,7 @@ Subcommands (non-monolithic API surface):
 4) `ms release remove`
 - Deletes one or more distribution test releases (PR-cleanup of artifacts + GitHub Release deletion).
 - Must be explicit and confirmable (irreversible part).
+- Supports `--yes` for automation.
 
 Common flags:
 - `--channel stable|beta`
