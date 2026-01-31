@@ -135,6 +135,19 @@ Workflows implemented (initial):
 Smoke inputs:
 - `petitechose-midi-studio/distribution/release-specs/v0.0.0-test.1.json` can be used to run `publish.yml` (beta) once secrets are configured.
 
+Smoke result:
+- Publish workflow succeeded for `v0.0.0-test.1` (beta prerelease).
+  - Release: https://github.com/petitechose-midi-studio/distribution/releases/tag/v0.0.0-test.1
+  - Assets include: `manifest.json`, `manifest.json.sig`, and per-OS bundle zips.
+
+Issues found + fixed during smoke:
+- Cargo workspace conflict when checking out repos under `src/`.
+  - Fix: `distribution/Cargo.toml` excludes `src/loader`, `src/oc-bridge`, `src/ms-manager`.
+- Linux build failed on missing `libudev`.
+  - Fix: install `libudev-dev` + `libusb-1.0-0-dev` on Ubuntu runners.
+- macOS runner label deprecation.
+  - Fix: switch to `macos-15-intel` (x86_64) and `macos-latest` (arm64).
+
 Pages:
 - `.github/workflows/pages.yml` added with placeholder content under `pages/`.
 - Blocker: org-level policy currently rejects enabling Pages for `petitechose-midi-studio/distribution` ("administrators disabled Pages creation").
