@@ -1,6 +1,6 @@
 # Phase 00: Baseline Verification + Repo Inventory
 
-Status: TODO
+Status: DONE
 
 ## Goal
 
@@ -24,9 +24,11 @@ Before adding new infrastructure, we must confirm:
   - `midi-studio-loader.exe list --json`
   - `midi-studio-loader.exe doctor --json`
   - `midi-studio-loader.exe flash <hex> --dry-run --json --json-progress none`
+  - `midi-studio-loader.exe flash <hex> --device halfkay:NOT_A_DEVICE --json --json-progress none`
 - Confirm:
   - `list --json` emits a single event `{schema,event:"list"}`.
-  - `flash` emits `operation_summary` even when `--json-progress none`.
+  - `flash --dry-run` emits a `dry_run` event.
+  - `flash` emits `operation_summary` even when `--json-progress none` (validate via a safe failure like `--device halfkay:NOT_A_DEVICE`).
   - `operation_summary` contains `exit_code`, `targets_*`, `bridge_*`, `blocks`, `retries`.
   - when `--json` is used: stdout is JSON-only (logs/progress go to stderr).
 
@@ -98,3 +100,8 @@ Full checks (local):
 - `cargo test` in:
   - `midi-studio/loader`
   - `open-control/bridge`
+
+## Notes (recorded)
+
+- `flash --dry-run` currently ends at `dry_run` (no `operation_summary`). For `operation_summary` verification without flashing, use a safe failure (`--device halfkay:NOT_A_DEVICE`).
+- On Windows in ms-dev-env today, oc-bridge service id is `OpenControlBridge` and the binary is `bin/bridge/oc-bridge.exe`.

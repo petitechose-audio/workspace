@@ -78,7 +78,7 @@ These are prerequisites we rely on.
 
 Status values: TODO | IN PROGRESS | DONE
 
-- Phase 00 (TODO): Baseline Verification + Repo Inventory
+- Phase 00 (DONE): Baseline Verification + Repo Inventory
   - File: `phase-00-baseline-verification.md`
 
 - Phase 01 (TODO): Release Spec + Manifest v2 + Signing + Anti-rollback
