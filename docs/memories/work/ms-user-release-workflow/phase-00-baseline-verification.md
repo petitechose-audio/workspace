@@ -91,6 +91,38 @@ Record the exact “v1 payload set” we will ship in the distribution bundle:
 - `README.md` baseline section remains accurate.
 - The v1 payload set is clearly recorded.
 
+## Results (recorded)
+
+v1 payload set (bundle contents):
+- `ms-manager` (GUI)
+- `ms-updater` (helper, used for atomic updates)
+- `midi-studio-loader` (firmware flashing)
+- `oc-bridge` + config folder
+- Bitwig extension: `midi_studio.bwextension`
+- Firmware bundles (Teensy)
+
+OS/arch matrix (v1):
+- Windows x86_64
+- macOS x86_64 + arm64
+- Linux x86_64
+
+Install roots + `current/` semantics (v1):
+- Windows:
+  - App: Program Files (installer)
+  - Payload root (versions/current/state/logs): `C:\ProgramData\MIDI Studio\`
+  - Bridge service exec path must point to stable `current/` (requires Phase 03 `--service-exec`)
+- macOS:
+  - App: `/Applications`
+  - Payload root: `~/Library/Application Support/MIDI Studio/`
+- Linux:
+  - App: user-level
+  - Payload root: `~/.local/share/midi-studio/`
+
+Nightly selection “CI passed” meaning (v1):
+- The release spec pins the required workflow file per repo (`required_ci_workflow_file`).
+- Nightly selects the latest `main` commit that has a successful run of that workflow.
+- If any required repo has no successful run: skip nightly.
+
 ## Tests
 
 Quick checks (local):
