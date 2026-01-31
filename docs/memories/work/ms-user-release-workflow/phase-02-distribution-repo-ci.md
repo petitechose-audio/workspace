@@ -119,7 +119,8 @@ Repo created:
 Baseline security applied:
 - `SECURITY.md` documents key handling and hardening.
 - `.github/CODEOWNERS` added for critical paths.
-- `main` branch protection enabled (PR + Code Owner review + 1 approval; no force-push/deletion).
+- `main` branch protection enabled (PR required; no force-push/deletion; conversation resolution).
+  - Note: approvals/code-owner review are recommended, but not enforced today (single-maintainer constraint).
 - GitHub Actions environments created:
   - `release` (required reviewer: `petitechose-audio`)
   - `nightly` (no reviewers)
@@ -145,8 +146,7 @@ High ROI measures to protect the signing key:
 
 - Branch protection on `main`:
   - require PR
-  - require Code Owner review
-  - require 1+ approvals
+  - (recommended when there are 2+ maintainers) require Code Owner review + approvals
   - disallow force-push and deletion
   - require conversation resolution
 
