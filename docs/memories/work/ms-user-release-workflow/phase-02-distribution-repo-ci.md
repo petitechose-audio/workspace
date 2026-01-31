@@ -132,6 +132,10 @@ Workflows implemented (initial):
 - `publish.yml` (manual stable/beta): builds loader + oc-bridge bundles, generates + signs manifest, publishes a GitHub Release.
 - `nightly.yml` (scheduled): selects latest green commits, builds bundles, signs with nightly key, publishes prerelease.
 
+Pages:
+- `.github/workflows/pages.yml` added with placeholder content under `pages/`.
+- Blocker: org-level policy currently rejects enabling Pages for `petitechose-midi-studio/distribution` ("administrators disabled Pages creation").
+
 Channels:
 - `channels/{stable,beta,nightly}.json` created (placeholder values until first release).
 - `schemas/channel-pointer.schema.json` created (includes `key_id`).
