@@ -132,6 +132,9 @@ Workflows implemented (initial):
 - `publish.yml` (manual stable/beta): builds loader + oc-bridge bundles, generates + signs manifest, publishes a GitHub Release.
 - `nightly.yml` (scheduled): selects latest green commits, builds bundles, signs with nightly key, publishes prerelease.
 
+Smoke inputs:
+- `petitechose-midi-studio/distribution/release-specs/v0.0.0-test.1.json` can be used to run `publish.yml` (beta) once secrets are configured.
+
 Pages:
 - `.github/workflows/pages.yml` added with placeholder content under `pages/`.
 - Blocker: org-level policy currently rejects enabling Pages for `petitechose-midi-studio/distribution` ("administrators disabled Pages creation").
