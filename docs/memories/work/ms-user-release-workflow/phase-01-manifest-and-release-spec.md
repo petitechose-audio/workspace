@@ -1,6 +1,6 @@
 # Phase 01: Release Spec + Manifest v2 + Signing + Anti-rollback
 
-Status: TODO
+Status: DONE
 
 ## Goal
 
@@ -83,10 +83,10 @@ Required fields (suggested):
 
 ## Exit Criteria
 
-- Schemas exist and are versioned.
+- Schemas exist and are versioned in the distribution repo.
 - A tool can generate a manifest from known artifacts.
 - Signature is generated and verified locally.
-- Anti-rollback rules are clearly implemented in the verification logic.
+- Anti-rollback policy is defined; enforcement lives in `ms-manager` (Phase 04/05).
 
 ## Tests
 
@@ -100,3 +100,26 @@ Local (full):
   - generate manifest
   - sign
   - verify signature + sha256
+
+## Notes (recorded)
+
+Implemented in `petitechose-midi-studio/distribution`:
+- Schemas:
+  - `schemas/release-spec.schema.json` (schema=1)
+  - `schemas/manifest.schema.json` (schema=2)
+- Examples:
+  - `examples/release-spec.example.json`
+  - `examples/manifest.example.json`
+- Tool:
+  - `tools/ms-dist-manifest`
+
+Signature/key format (current):
+- `MS_DIST_ED25519_SK`: base64(32-byte Ed25519 signing key seed).
+- `MS_DIST_ED25519_PK`: base64(32-byte Ed25519 public key).
+- `manifest.json.sig`: ASCII file containing base64(signature) + newline.
+
+Tool commands:
+- Build: `cargo run -p ms-dist-manifest -- build --spec release-spec.json --dist dist --out manifest.json`
+- Sign: `cargo run -p ms-dist-manifest -- sign --in manifest.json --out manifest.json.sig`
+- Verify: `cargo run -p ms-dist-manifest -- verify --in manifest.json --sig manifest.json.sig`
+- Public key: `cargo run -p ms-dist-manifest -- pubkey`
