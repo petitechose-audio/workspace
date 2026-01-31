@@ -24,7 +24,10 @@ This phase focuses on the foundation (network + storage + verification + minimal
 ## Core Architecture
 
 Backend (Rust):
-- `dist_client`: fetch `channels/*.json`, fetch manifest, download assets
+- `dist_client`:
+  - fetch latest stable manifest via GitHub Releases `latest` endpoint
+  - list available releases for rollback via GitHub Releases API
+  - download assets (with caching)
 - `verify`: Ed25519 signature verify + sha256 verify
 - `storage`: install roots, cache, versions/current
 - `ops`: install/update transactions (Phase 05 will finalize)
@@ -33,7 +36,7 @@ Frontend (Svelte):
 - Simple mode: one button “Install latest stable”
 - Advanced mode:
   - select channel
-  - list tags from `channels/<channel>-index.json`
+  - list tags via GitHub Releases API (fallback: installed local versions)
   - install selected tag
 
 ## Install Roots (v1)
@@ -55,9 +58,17 @@ Within payload root:
 ## Exit Criteria
 
 - App runs on all target OS.
-- Can fetch `channels/stable.json` from distribution repo and install that tag.
+- Can fetch latest stable manifest from:
+  - `https://github.com/petitechose-midi-studio/distribution/releases/latest/download/manifest.json`
+  - `https://github.com/petitechose-midi-studio/distribution/releases/latest/download/manifest.json.sig`
 - Verifies manifest signature and asset sha256.
 - Stores downloaded assets in a cache and reuses it.
+
+## Notes (recorded)
+
+Public keys (Ed25519, base64, 32 bytes):
+- stable/release: `2rHtM99leFGTpjZ8fZHNCdGXlEKmAw6hEyaat1uGO3M=`
+- nightly: `voOksaS+NoUkEy9c8YunbTwPnb1dlXCyEJ9Yy07233A=`
 
 ## Tests
 

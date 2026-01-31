@@ -1,6 +1,6 @@
 # Phase 02: Distribution Repo + CI (stable/beta/nightly) + Pages Demos
 
-Status: IN PROGRESS
+Status: DONE
 
 ## Goal
 
@@ -9,7 +9,16 @@ Create the dedicated distribution repo and implement:
 - Stable/beta publish workflow (manual / workflow_dispatch)
 - Nightly workflow (scheduled, skip if not fully green)
 - GitHub Pages demos (per channel)
-- Channel pointer files (no GitHub API required for default install)
+- Pages site (channels + demo placeholders)
+
+Important constraint (today):
+- Org policy prevents GitHub Actions from creating PRs.
+- This repo requires PRs for changes to `main`.
+- Therefore `channels/*.json` cannot be auto-updated by CI.
+
+Default install strategy (v1):
+- Stable update uses GitHub Releases `latest` assets.
+- Advanced selection / rollback lists releases via GitHub Releases API.
 
 ## Repo Layout (recommended)
 
@@ -17,9 +26,7 @@ Create the dedicated distribution repo and implement:
   - `stable.json`
   - `beta.json`
   - `nightly.json`
-  - `stable-index.json` (optional, but recommended for Advanced UI)
-  - `beta-index.json`
-  - `nightly-index.json`
+  - optional index files can be added later, but v1 uses GitHub Releases API for listing
 
 - `schemas/` (from Phase 01)
 
@@ -55,7 +62,7 @@ Steps (high-level):
 5) Package zips with deterministic names.
 6) Generate + sign `manifest.json`.
 7) Create GitHub Release + upload all assets.
-8) Update `channels/<channel>.json` and optional index.
+8) Emit channel pointer URLs (manual update via PR).
 9) Deploy Pages demos for that channel.
 
 ### B) nightly.yml
@@ -108,8 +115,9 @@ The demos are built in CI but are not included in the installed bundle.
 - Distribution repo exists and is public.
 - publish workflow produces a release with signed manifest and correct assets.
 - nightly workflow skips if any repo lacks green CI.
-- pages deploy works and URLs are recorded in manifest.
-- channel pointers are updated atomically.
+- pages deploy works.
+- Stable update uses `releases/latest/download/manifest.json` + `.sig`.
+- Release listing for rollback is possible via GitHub Releases API.
 
 ## Progress (recorded)
 
@@ -161,7 +169,7 @@ Channel pointer updates:
 - Org policy blocks GitHub Actions from creating PRs.
 - `main` requires PRs for changes.
 - Therefore `publish.yml`/`nightly.yml` do not auto-update `channels/*.json` (they print URLs in job summary).
-- Channel pointers must be updated manually via PR (use `scripts/update_channel_pointer.py`).
+- Channel pointers are updated manually via PR (use `scripts/update_channel_pointer.py`).
 - Beta pointer is now set:
   - `channels/beta.json` -> `v0.0.0-test.3`
 
