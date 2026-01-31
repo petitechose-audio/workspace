@@ -11,6 +11,9 @@ Key requirements:
 - Stop/start services at the right times.
 - Roll back to the previous `current` on failure.
 
+Prerequisites:
+- Phase 03 is complete (service name + `--service-exec`), so oc-bridge can be installed/restarted using a stable service definition that points to `current/`.
+
 ## Recommended Implementation
 
 Use a separate helper binary (ship as sidecar):
@@ -24,11 +27,11 @@ High-level flow:
 1) ms-manager downloads + verifies everything.
 2) ms-manager spawns ms-updater with an “apply plan” file.
 3) ms-updater:
-   - stops oc-bridge service (if running)
-   - extracts/stages new version into `versions/<tag>`
-   - atomically switches `current` (junction/symlink)
-   - restarts service
-   - relaunches ms-manager
+    - stops oc-bridge service (if running; use the dedicated MIDI Studio service name)
+    - extracts/stages new version into `versions/<tag>`
+    - atomically switches `current` (junction/symlink)
+    - restarts service (service should already reference the stable `current/` exec path)
+    - relaunches ms-manager
 
 ## Atomicity Details
 

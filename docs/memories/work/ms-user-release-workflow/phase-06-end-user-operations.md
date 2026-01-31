@@ -17,6 +17,7 @@ Implement the end-user operations in ms-manager:
 
 - Configure and install bridge as a user service on macOS/Linux.
 - Windows: install service with dedicated name (requires upstream oc-bridge flags).
+- Never touch the default oc-bridge service/unit; always use the MIDI Studio-specific service name.
 - Expose in UI:
   - status
   - restart
@@ -36,6 +37,9 @@ Implement the end-user operations in ms-manager:
   - `current/firmware/.../firmware.hex`
 - Flash via subprocess:
   - `midi-studio-loader flash ... --json --json-timestamps --json-progress percent`
+- Safety net: after the subprocess exits (success/fail/user-cancel), ensure oc-bridge is not left paused:
+  - run `oc-bridge ctl status`
+  - if paused: run `oc-bridge ctl resume` and record the action in logs/diagnostics
 - UI:
   - list targets
   - choose target
@@ -63,3 +67,4 @@ Local (fast):
 Local (manual smoke):
 - Plug device, flash dry-run, then flash real.
 - Restart service and confirm loader can pause/resume.
+- Start a flash and cancel it; confirm `oc-bridge ctl status` is not left paused.

@@ -15,12 +15,14 @@ Validate the full system and publish the first public stable release.
 - Install bridge service
 - Deploy Bitwig extension
 - Flash firmware
+- Cancel a flash mid-way and confirm the bridge is not left paused (`oc-bridge ctl status`).
 
 2) Update
 
 - From stable tag A to stable tag B
 - Ensure atomic `current` switch
 - Ensure bridge service restarts cleanly
+- Ensure the bridge service definition references a stable `current/` exec path (not a versioned path).
 - Ensure Bitwig extension is updated
 
 3) Repair

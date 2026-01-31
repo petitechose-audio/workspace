@@ -13,6 +13,9 @@ Ship a stable bootstrap installer that:
 
 The bootstrap should change rarely.
 
+Prerequisites:
+- Phase 03 is complete so ms-manager can install/manage oc-bridge without collisions and with a stable exec path (`--service-name`, `--service-exec`, `--no-desktop-file`).
+
 ## Approach (recommended)
 
 - Use Tauri bundler to build installers per platform.
@@ -45,5 +48,5 @@ Manual (required):
 - Confirm:
   - ms-manager launches
   - installs stable bundle
-  - oc-bridge service works
+  - oc-bridge service works (installed under the MIDI Studio service name; points to `current/` exec path)
   - PATH and shortcuts work

@@ -28,6 +28,14 @@ Before adding new infrastructure, we must confirm:
   - `list --json` emits a single event `{schema,event:"list"}`.
   - `flash` emits `operation_summary` even when `--json-progress none`.
   - `operation_summary` contains `exit_code`, `targets_*`, `bridge_*`, `blocks`, `retries`.
+  - when `--json` is used: stdout is JSON-only (logs/progress go to stderr).
+
+Also verify a critical safety invariant:
+- Pick a target that requires bridge pausing (typically `serial:*`).
+- Start a flash and interrupt it (user cancel / kill process / unplug).
+- Confirm the bridge does not remain paused:
+  - `oc-bridge ctl status` shows resumed/running.
+  - if it ends up paused, treat as a must-fix before Phase 06.
 
 2) Verify oc-bridge capabilities and gaps
 

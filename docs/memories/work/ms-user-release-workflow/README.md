@@ -31,6 +31,7 @@ Before doing any work:
 - Reproducible releases: a bundle tag must map to exact repo SHAs (recorded in manifest).
 - Safe-by-default updates: verify signatures + hashes; atomic switch of `current/`; rollback on failure.
 - Nightly safety: publish only if all required CI checks are green and the distribution build passes.
+- Never leave the bridge paused: any flash attempt must end with oc-bridge resumed (success/fail/cancel).
 - Minimal end-user friction:
   - default install = latest stable bundle
   - stable `current/` path for shortcuts and services
@@ -103,6 +104,11 @@ Status values: TODO | IN PROGRESS | DONE
 
 - Phase 08 (TODO): End-to-end Validation + First Public Release
   - File: `phase-08-e2e-and-first-release.md`
+
+## Phase Dependencies (important)
+
+- Phase 03 is a prerequisite for Phases 05/06/07.
+  - Rationale: atomic `current/` upgrades and bridge lifecycle management require a stable service name and a stable service exec path (not a versioned `current_exe()` result).
 
 ## Notes (ongoing)
 

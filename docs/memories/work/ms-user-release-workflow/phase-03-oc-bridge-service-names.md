@@ -53,6 +53,7 @@ Recommended values (documented in ms-manager):
 ## Exit Criteria
 
 - oc-bridge supports configurable service name on Windows and Linux.
+- oc-bridge supports `--service-exec <absolute_path>` on Windows and Linux, and the installed service/unit uses it.
 - Linux `--no-desktop-file` works.
 - Existing oc-bridge users are not broken (defaults unchanged).
 
@@ -66,7 +67,13 @@ Windows (manual smoke):
 - verify service exists and starts
 - `oc-bridge uninstall --service-name MidiStudioBridge`
 
+Windows (manual smoke - exec override):
+- `oc-bridge install --service-name MidiStudioBridge --service-exec <ABSOLUTE_PATH_TO_CURRENT_OC_BRIDGE_EXE>`
+- verify the service points to the provided path
+- `oc-bridge uninstall --service-name MidiStudioBridge`
+
 Linux (manual smoke):
-- `oc-bridge install --service-name midi-studio-bridge --no-desktop-file`
+- `oc-bridge install --service-name midi-studio-bridge --service-exec <ABSOLUTE_PATH_TO_CURRENT_OC_BRIDGE> --no-desktop-file`
 - `systemctl --user status midi-studio-bridge`
+- verify the unit ExecStart uses the provided path
 - ensure no `.desktop` is created
