@@ -3,6 +3,8 @@
 # This graph describes the dev/release readiness perimeter. It references
 # repositories from ms/data/repos.toml by GitHub slug and deliberately does not
 # duplicate URLs.
+# An empty pin_dependencies list means the consumer has no standalone
+# PlatformIO release pins; its dependencies are provided by CI or Core's BOM.
 
 [[nodes]]
 id = "oc-bridge"
@@ -19,6 +21,7 @@ id = "oc-note"
 repo = "open-control/note"
 role = "bom_dependency"
 depends_on = ["oc-framework"]
+pin_dependencies = []
 
 [[nodes]]
 id = "oc-hal-common"
@@ -31,18 +34,21 @@ id = "oc-hal-midi"
 repo = "open-control/hal-midi"
 role = "dev_dependency"
 depends_on = ["oc-framework", "oc-hal-common"]
+pin_dependencies = []
 
 [[nodes]]
 id = "oc-hal-net"
 repo = "open-control/hal-net"
 role = "dev_dependency"
 depends_on = ["oc-framework", "oc-hal-common"]
+pin_dependencies = []
 
 [[nodes]]
 id = "oc-hal-sdl"
 repo = "open-control/hal-sdl"
 role = "dev_dependency"
 depends_on = ["oc-framework", "oc-hal-common"]
+pin_dependencies = []
 
 [[nodes]]
 id = "oc-hal-teensy"
@@ -66,24 +72,28 @@ id = "oc-ui-lvgl-cli-tools"
 repo = "open-control/ui-lvgl-cli-tools"
 role = "dev_dependency"
 depends_on = ["oc-ui-lvgl"]
+pin_dependencies = []
 
 [[nodes]]
 id = "oc-ui-lvgl-components"
 repo = "open-control/ui-lvgl-components"
 role = "bom_dependency"
 depends_on = ["oc-framework", "oc-ui-lvgl"]
+pin_dependencies = []
 
 [[nodes]]
 id = "ms-loader"
 repo = "petitechose-midi-studio/loader"
 role = "release_producer"
 depends_on = ["oc-bridge"]
+pin_dependencies = []
 
 [[nodes]]
 id = "ms-ui"
 repo = "petitechose-midi-studio/ui"
 role = "dev_dependency"
 depends_on = ["oc-ui-lvgl"]
+pin_dependencies = []
 
 [[nodes]]
 id = "device-support"
