@@ -6,6 +6,7 @@ from typing import Literal, NoReturn
 
 import typer
 
+from ms.cli.commands.ux_hardware import hardware_app
 from ms.cli.context import CLIContext, build_context
 from ms.cli.selector import SelectorOption, is_interactive_terminal, select_one, select_one_with_run
 from ms.core.errors import ErrorCode
@@ -26,6 +27,7 @@ ux_app = typer.Typer(
     no_args_is_help=False,
     rich_markup_mode="rich",
 )
+ux_app.add_typer(hardware_app, name="hardware", help="Isolated, autonomous hardware benchmarks.")
 
 
 @dataclass(frozen=True, slots=True)

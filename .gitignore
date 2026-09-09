@@ -41,6 +41,8 @@ baseline-compare/
 bin/
 bin-*/
 .build/
+.bench/
+.ux-lot1/
 .tmp/
 
 # IDE
