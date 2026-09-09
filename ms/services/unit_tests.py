@@ -921,7 +921,11 @@ class UnitTestService(BaseService):
         if any(path is None or not path.exists() for path in wrappers.values()):
             return Err(ToolMissing(tool_id="zig"))
 
-        return Ok([f"-D{name}={path}" for name, path in wrappers.items() if path is not None])
+        return Ok([
+            f"-D{name}:FILEPATH={path.as_posix()}"
+            for name, path in wrappers.items()
+            if path is not None
+        ])
 
     def _toolchain_build_id(self) -> str:
         if self._platform.platform.is_windows:

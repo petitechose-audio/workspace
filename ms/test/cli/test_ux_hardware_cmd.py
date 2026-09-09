@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from ms.cli.commands.ux import ux_app
@@ -13,7 +14,7 @@ def test_hardware_help_and_explicit_device_options() -> None:
     assert "reboot" in result.output
     result = runner.invoke(ux_app, ["hardware", "run", "input.ux"])
     assert result.exit_code != 0
-    assert "--serial" in result.output
+    assert "--serial" in unstyle(result.output)
 
 
 def test_invalid_script_fails_before_connecting(
