@@ -9,8 +9,35 @@ import ms.services.unit_tests as unit_tests
 from ms.core.result import Err, Ok
 from ms.core.workspace import Workspace
 from ms.output.console import MockConsole
-from ms.platform.detection import detect
+from ms.platform.detection import Arch, LinuxDistro, Platform, PlatformInfo, detect
 from ms.services.unit_tests import UnitTestDependencyError, UnitTestService
+
+
+def test_windows_compiler_paths_are_safe_for_cmake_cache(
+    tmp_path: Path, monkeypatch: MonkeyPatch,
+) -> None:
+    service = UnitTestService(
+        workspace=Workspace(root=tmp_path),
+        platform=PlatformInfo(
+            platform=Platform.WINDOWS, arch=Arch.X64, distro=LinuxDistro.UNKNOWN,
+        ),
+        config=None,
+        console=MockConsole(),
+    )
+    wrapper_dir = tmp_path / "tool wrappers"
+    wrapper_dir.mkdir()
+
+    def wrapper(name: str) -> Path:
+        path = wrapper_dir / f"{name}.cmd"
+        path.touch()
+        return path
+
+    monkeypatch.setattr(service._registry, "get_zig_wrapper", wrapper)  # pyright: ignore[reportPrivateUsage]
+    result = service._compiler_args()  # pyright: ignore[reportPrivateUsage]
+    assert isinstance(result, Ok)
+    assert len(result.value) == 5
+    assert all(":FILEPATH=" in arg and "\\" not in arg for arg in result.value)
+    assert f"-DCMAKE_RC_COMPILER:FILEPATH={wrapper('zig-rc').as_posix()}" in result.value
 
 
 def test_load_test_dependency_pin_reads_manifest(
